@@ -42,6 +42,7 @@ class MatterCodeStore:
         numeric_code: str = "",
         manufacturer: str = "",
         model: str = "",
+        ha_device_id: str = "",
     ) -> dict[str, Any]:
         """Add a new device entry."""
         now = datetime.now(timezone.utc).isoformat()
@@ -52,6 +53,7 @@ class MatterCodeStore:
             "numeric_code": numeric_code,
             "manufacturer": manufacturer,
             "model": model,
+            "ha_device_id": ha_device_id,
             "created_at": now,
             "updated_at": now,
         }
@@ -67,6 +69,7 @@ class MatterCodeStore:
         numeric_code: str | None = None,
         manufacturer: str | None = None,
         model: str | None = None,
+        ha_device_id: str | None = None,
     ) -> dict[str, Any] | None:
         """Update an existing device entry."""
         for device in self._devices:
@@ -81,6 +84,8 @@ class MatterCodeStore:
                     device["manufacturer"] = manufacturer
                 if model is not None:
                     device["model"] = model
+                if ha_device_id is not None:
+                    device["ha_device_id"] = ha_device_id
                 device["updated_at"] = datetime.now(timezone.utc).isoformat()
                 await self.async_save()
                 return device

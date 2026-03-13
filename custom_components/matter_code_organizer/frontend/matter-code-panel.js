@@ -147,6 +147,14 @@ const TRANSLATIONS = {
     linkDevice: "Link to Home Assistant device",
     linkNone: "-- No link --",
     autoNumeric: "Auto-computed from QR code",
+    importDevices: "Import Devices",
+    importTitle: "Import Matter Devices",
+    importHint: "Select HA Matter devices to import into the organizer.",
+    importSelectAll: "Select All",
+    importDeselectAll: "Deselect All",
+    importSelected: "Import Selected",
+    importAllDone: "All Matter devices are already imported.",
+    linkedDevice: "Linked HA device",
   },
   de: {
     title: "Matter Code Organizer",
@@ -178,6 +186,14 @@ const TRANSLATIONS = {
     linkDevice: "Mit Home Assistant Gerät verknüpfen",
     linkNone: "-- Keine Verknüpfung --",
     autoNumeric: "Automatisch aus QR-Code berechnet",
+    importDevices: "Geräte importieren",
+    importTitle: "Matter-Geräte importieren",
+    importHint: "Wählen Sie HA Matter-Geräte zum Import in den Organizer.",
+    importSelectAll: "Alle auswählen",
+    importDeselectAll: "Alle abwählen",
+    importSelected: "Ausgewählte importieren",
+    importAllDone: "Alle Matter-Geräte sind bereits importiert.",
+    linkedDevice: "Verknüpftes HA-Gerät",
   },
 };
 
@@ -193,6 +209,8 @@ class MatterCodePanel extends HTMLElement {
     this._scanAnimFrame = null;
     this._copiedId = null;
     this._matterHADevices = [];
+    this._showImportDialog = false;
+    this._importSelection = new Set();
   }
 
   set hass(hass) {
@@ -241,7 +259,7 @@ class MatterCodePanel extends HTMLElement {
     }
   }
 
-  async _addDevice(name, matterQrCode, numericCode, manufacturer, model) {
+  async _addDevice(name, matterQrCode, numericCode, manufacturer, model, haDeviceId) {
     await this._hass.callWS({
       type: "matter_code_organizer/add_device",
       name,
@@ -249,11 +267,12 @@ class MatterCodePanel extends HTMLElement {
       numeric_code: numericCode,
       manufacturer: manufacturer || "",
       model: model || "",
+      ha_device_id: haDeviceId || "",
     });
     await this._loadDevices();
   }
 
-  async _updateDevice(id, name, matterQrCode, numericCode, manufacturer, model) {
+  async _updateDevice(id, name, matterQrCode, numericCode, manufacturer, model, haDeviceId) {
     await this._hass.callWS({
       type: "matter_code_organizer/update_device",
       device_id: id,
@@ -262,6 +281,7 @@ class MatterCodePanel extends HTMLElement {
       numeric_code: numericCode,
       manufacturer: manufacturer || "",
       model: model || "",
+      ha_device_id: haDeviceId || "",
     });
     await this._loadDevices();
   }
@@ -440,6 +460,29 @@ class MatterCodePanel extends HTMLElement {
           width: 120px; height: 120px; display: flex; align-items: center;
           justify-content: center; color: var(--secondary-text); font-size: 13px; text-align: center;
         }
+        .device-link-badge {
+          display: inline-flex; align-items: center; gap: 4px;
+          font-size: 12px; color: var(--primary-color); cursor: pointer;
+          margin-top: 4px; text-decoration: none;
+        }
+        .device-link-badge:hover { text-decoration: underline; }
+        .device-link-badge svg { flex-shrink: 0; }
+        .import-list { max-height: 400px; overflow-y: auto; margin: 12px 0; }
+        .import-item {
+          display: flex; align-items: center; gap: 10px; padding: 10px 8px;
+          border-bottom: 1px solid var(--divider); cursor: pointer;
+        }
+        .import-item:hover { background: rgba(0,0,0,0.03); }
+        .import-item input[type="checkbox"] { flex-shrink: 0; width: 18px; height: 18px; cursor: pointer; }
+        .import-item-info { flex: 1; min-width: 0; }
+        .import-item-name { font-size: 14px; font-weight: 500; }
+        .import-item-detail { font-size: 12px; color: var(--secondary-text); }
+        .import-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .import-toolbar button {
+          background: none; border: none; color: var(--primary-color);
+          cursor: pointer; font-size: 13px; padding: 4px 8px;
+        }
+        .import-toolbar button:hover { text-decoration: underline; }
         @media (max-width: 600px) {
           .device-card { flex-direction: column; align-items: center; text-align: center; }
           .device-info { width: 100%; }
@@ -451,6 +494,10 @@ class MatterCodePanel extends HTMLElement {
       <div class="toolbar">
         <div class="toolbar-title">${this._t("title")}</div>
         <div class="toolbar-actions">
+          <button id="btn-import">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+            <span class="btn-text">${this._t("importDevices")}</span>
+          </button>
           <button id="btn-scan">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M9.5 6.5v3h-3v-3h3M11 5H5v6h6V5zm-1.5 9.5v3h-3v-3h3M11 13H5v6h6v-6zm6.5-6.5v3h-3v-3h3M19 5h-6v6h6V5zm-6 8h1.5v1.5H13V13zm1.5 1.5H16V16h-1.5v-1.5zM16 13h1.5v1.5H16V13zm-3 3h1.5v1.5H13V16zm1.5 1.5H16V19h-1.5v-1.5zM16 16h1.5v1.5H16V16zm1.5-1.5H19V16h-1.5v-1.5zm0 3H19V19h-1.5v-1.5z"/></svg>
             <span class="btn-text">${this._t("scan")}</span>
@@ -494,6 +541,10 @@ class MatterCodePanel extends HTMLElement {
                           </button>
                         </div>`
                       : ""}
+                    ${d.ha_device_id ? `<a class="device-link-badge" href="/config/devices/device/${this._escHtml(d.ha_device_id)}" title="${this._t("linkedDevice")}">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/></svg>
+                      ${this._t("linkedDevice")}
+                    </a>` : ""}
                   </div>
                   <div class="device-actions">
                     <button class="menu-btn" data-menu="${d.id}">\u22EE</button>
@@ -534,6 +585,10 @@ class MatterCodePanel extends HTMLElement {
       `;
     }
 
+    if (this._showImportDialog) {
+      return this._renderImportDialog();
+    }
+
     if (!this._editingDevice) return "";
 
     const d = this._editingDevice;
@@ -542,6 +597,7 @@ class MatterCodePanel extends HTMLElement {
     const derivedNumeric = deriveNumericCode(qrVal);
     const numericVal = (d && d.numeric_code) || "";
     const showAutoHint = !numericVal && derivedNumeric;
+    const haDeviceId = (d && d.ha_device_id) || "";
 
     return `
       <div class="overlay" id="overlay">
@@ -557,7 +613,8 @@ class MatterCodePanel extends HTMLElement {
                 if (!dev) return "";
                 const devName = dev.name_by_user || dev.name || "Unknown";
                 const extra = dev.manufacturer ? ` (${dev.manufacturer}${dev.model ? " " + dev.model : ""})` : "";
-                return `<option value="${this._escHtml(dev.id)}">${this._escHtml(devName + extra)}</option>`;
+                const selected = dev.id === haDeviceId ? " selected" : "";
+                return `<option value="${this._escHtml(dev.id)}"${selected}>${this._escHtml(devName + extra)}</option>`;
               }).join("")}
             </select>
           </div>
@@ -593,12 +650,62 @@ class MatterCodePanel extends HTMLElement {
     `;
   }
 
+  _renderImportDialog() {
+    const importedIds = new Set(this._devices.map((d) => d.ha_device_id).filter(Boolean));
+    const unimported = (this._matterHADevices || []).filter((d) => d && !importedIds.has(d.id));
+    const selCount = this._importSelection.size;
+
+    return `
+      <div class="overlay" id="overlay">
+        <div class="dialog">
+          <h2>${this._t("importTitle")}</h2>
+          <p style="color: var(--secondary-text); font-size: 14px; margin: 0 0 12px 0;">${this._t("importHint")}</p>
+          ${unimported.length === 0
+            ? `<div class="empty-state" style="padding: 30px 20px;">${this._t("importAllDone")}</div>`
+            : `
+              <div class="import-toolbar">
+                <button id="btn-import-select-all">${this._t("importSelectAll")}</button>
+                <button id="btn-import-deselect-all">${this._t("importDeselectAll")}</button>
+              </div>
+              <div class="import-list">
+                ${unimported.map((dev) => {
+                  const devName = dev.name_by_user || dev.name || "Unknown";
+                  const detail = dev.manufacturer ? `${dev.manufacturer}${dev.model ? " " + dev.model : ""}` : (dev.model || "");
+                  const checked = this._importSelection.has(dev.id) ? "checked" : "";
+                  return `
+                    <label class="import-item" data-import-id="${this._escHtml(dev.id)}">
+                      <input type="checkbox" ${checked} data-dev-id="${this._escHtml(dev.id)}" />
+                      <div class="import-item-info">
+                        <div class="import-item-name">${this._escHtml(devName)}</div>
+                        ${detail ? `<div class="import-item-detail">${this._escHtml(detail)}</div>` : ""}
+                      </div>
+                    </label>`;
+                }).join("")}
+              </div>
+            `}
+          <div class="dialog-actions">
+            <button class="btn-cancel" id="btn-import-cancel">${this._t("cancel")}</button>
+            ${unimported.length > 0
+              ? `<button class="btn-save" id="btn-import-go" ${selCount === 0 ? "disabled" : ""}>${this._t("importSelected")} (${selCount})</button>`
+              : ""}
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
   _bindEvents() {
     const $ = (sel) => this.shadowRoot.querySelector(sel);
     const $$ = (sel) => this.shadowRoot.querySelectorAll(sel);
 
     $("#btn-add")?.addEventListener("click", () => {
-      this._editingDevice = { name: "", matter_qr_code: "", numeric_code: "", manufacturer: "", model: "" };
+      this._editingDevice = { name: "", matter_qr_code: "", numeric_code: "", manufacturer: "", model: "", ha_device_id: "" };
+      this._render();
+    });
+
+    $("#btn-import")?.addEventListener("click", () => {
+      this._showImportDialog = true;
+      this._importSelection = new Set();
       this._render();
     });
 
@@ -708,11 +815,45 @@ class MatterCodePanel extends HTMLElement {
       });
     });
 
+    // Import dialog events
+    $("#btn-import-cancel")?.addEventListener("click", () => {
+      this._showImportDialog = false;
+      this._importSelection = new Set();
+      this._render();
+    });
+
+    $("#btn-import-select-all")?.addEventListener("click", () => {
+      const importedIds = new Set(this._devices.map((d) => d.ha_device_id).filter(Boolean));
+      const unimported = (this._matterHADevices || []).filter((d) => d && !importedIds.has(d.id));
+      this._importSelection = new Set(unimported.map((d) => d.id));
+      this._render();
+    });
+
+    $("#btn-import-deselect-all")?.addEventListener("click", () => {
+      this._importSelection = new Set();
+      this._render();
+    });
+
+    $$("input[data-dev-id]").forEach((cb) => {
+      cb.addEventListener("change", (e) => {
+        const devId = e.target.dataset.devId;
+        if (e.target.checked) {
+          this._importSelection.add(devId);
+        } else {
+          this._importSelection.delete(devId);
+        }
+        this._render();
+      });
+    });
+
+    $("#btn-import-go")?.addEventListener("click", () => this._handleImport());
+
     $("#overlay")?.addEventListener("click", (e) => {
       if (e.target.id === "overlay") {
         this._stopScanner();
         this._editingDevice = null;
         this._scanning = false;
+        this._showImportDialog = false;
         this._render();
       }
     });
@@ -731,6 +872,7 @@ class MatterCodePanel extends HTMLElement {
     let numeric = ($("#field-numeric")?.value || "").trim();
     const manufacturer = ($("#field-manufacturer")?.value || "").trim();
     const model = ($("#field-model")?.value || "").trim();
+    const haDeviceId = ($("#field-ha-device")?.value || "").trim();
     const errorEl = $("#form-error");
 
     if (!name) {
@@ -750,14 +892,41 @@ class MatterCodePanel extends HTMLElement {
 
     try {
       if (this._editingDevice && this._editingDevice.id) {
-        await this._updateDevice(this._editingDevice.id, name, qr, numeric, manufacturer, model);
+        await this._updateDevice(this._editingDevice.id, name, qr, numeric, manufacturer, model, haDeviceId);
       } else {
-        await this._addDevice(name, qr, numeric, manufacturer, model);
+        await this._addDevice(name, qr, numeric, manufacturer, model, haDeviceId);
       }
       this._editingDevice = null;
     } catch (e) {
       console.error("Save error:", e);
       if (errorEl) { errorEl.textContent = e.message || "Error saving device"; errorEl.style.display = "block"; }
+    }
+  }
+
+  async _handleImport() {
+    if (this._importSelection.size === 0) return;
+    const devicesToImport = [];
+    for (const devId of this._importSelection) {
+      const haDev = this._matterHADevices.find((d) => d && d.id === devId);
+      if (haDev) {
+        devicesToImport.push({
+          ha_device_id: haDev.id,
+          name: haDev.name_by_user || haDev.name || "Unknown",
+          manufacturer: haDev.manufacturer || "",
+          model: haDev.model || "",
+        });
+      }
+    }
+    try {
+      await this._hass.callWS({
+        type: "matter_code_organizer/import_devices",
+        devices: devicesToImport,
+      });
+      this._showImportDialog = false;
+      this._importSelection = new Set();
+      await this._loadDevices();
+    } catch (e) {
+      console.error("Import error:", e);
     }
   }
 
