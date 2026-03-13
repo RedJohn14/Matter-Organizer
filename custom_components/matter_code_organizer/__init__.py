@@ -41,7 +41,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             StaticPathConfig(f"{PANEL_URL}/frontend", frontend_path, False),
             StaticPathConfig(
                 f"/brands/{DOMAIN}",
-                integration_path,
+                os.path.join(integration_path, "brand"),
                 True,
             ),
         ]
