@@ -20,6 +20,21 @@ PANEL_TITLE = "Matter Codes"
 PANEL_FRONTEND_PATH = "matter-codes"
 
 
+async def async_setup(hass: HomeAssistant, config) -> bool:
+    """Set up the Matter Code Organizer integration."""
+    integration_path = os.path.dirname(__file__)
+    await hass.http.async_register_static_paths(
+        [
+            StaticPathConfig(
+                f"/brands/{DOMAIN}",
+                os.path.join(integration_path, "brand"),
+                True,
+            ),
+        ]
+    )
+    return True
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Matter Code Organizer from a config entry."""
     store = MatterCodeStore(hass)
@@ -33,17 +48,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     websocket_api.async_register_command(hass, ws_update_device)
     websocket_api.async_register_command(hass, ws_delete_device)
 
-    # Register static paths for frontend files and brand icons
+    # Register static paths for frontend files
     integration_path = os.path.dirname(__file__)
     frontend_path = os.path.join(integration_path, "frontend")
     await hass.http.async_register_static_paths(
         [
             StaticPathConfig(f"{PANEL_URL}/frontend", frontend_path, False),
-            StaticPathConfig(
-                f"/brands/{DOMAIN}",
-                os.path.join(integration_path, "brand"),
-                True,
-            ),
         ]
     )
 
