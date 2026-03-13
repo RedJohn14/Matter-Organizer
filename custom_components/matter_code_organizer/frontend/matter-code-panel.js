@@ -1,0 +1,844 @@
+/**
+ * Matter Code Organizer - Sidebar Panel
+ * LitElement-based web component for managing Matter device pairing codes.
+ */
+
+const BASE_PATH = "/matter_code_organizer/frontend";
+
+const _loadScript = (src) =>
+  new Promise((resolve, reject) => {
+    if (document.querySelector(`script[src="${src}"]`)) {
+      resolve();
+      return;
+    }
+    const s = document.createElement("script");
+    s.src = src;
+    s.onload = resolve;
+    s.onerror = reject;
+    document.head.appendChild(s);
+  });
+
+const _scriptsReady = Promise.all([
+  _loadScript(`${BASE_PATH}/qrcode.min.js`),
+  _loadScript(`${BASE_PATH}/jsQR.min.js`),
+]);
+
+// --- Matter QR Code Decoder ---
+
+const BASE38_CHARS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ-.";
+
+function _decodeMatterQR(mtString) {
+  let encoded = mtString;
+  if (encoded.startsWith("MT:")) encoded = encoded.substring(3);
+
+  const bytes = [];
+  let i = 0;
+  while (i < encoded.length) {
+    const chunkLen = Math.min(5, encoded.length - i);
+    let val = 0;
+    for (let j = 0; j < chunkLen; j++) {
+      const idx = BASE38_CHARS.indexOf(encoded[i + j]);
+      if (idx < 0) return null;
+      val += idx * Math.pow(38, j);
+    }
+    if (chunkLen === 5) {
+      bytes.push(val & 0xFF, (val >> 8) & 0xFF, (val >> 16) & 0xFF);
+    } else if (chunkLen === 4) {
+      bytes.push(val & 0xFF, (val >> 8) & 0xFF);
+    } else if (chunkLen === 2) {
+      bytes.push(val & 0xFF);
+    }
+    i += chunkLen;
+  }
+
+  let payload = 0n;
+  for (let j = bytes.length - 1; j >= 0; j--) {
+    payload = (payload << 8n) | BigInt(bytes[j]);
+  }
+
+  const version = Number(payload & 0x7n);
+  const vendorId = Number((payload >> 3n) & 0xFFFFn);
+  const productId = Number((payload >> 19n) & 0xFFFFn);
+  const customFlow = Number((payload >> 35n) & 0x3n);
+  const discoveryCaps = Number((payload >> 37n) & 0xFFn);
+  const discriminator = Number((payload >> 45n) & 0xFFFn);
+  const passcode = Number((payload >> 57n) & 0x7FFFFFFn);
+
+  return { version, vendorId, productId, customFlow, discoveryCaps, discriminator, passcode };
+}
+
+// --- Verhoeff checksum ---
+
+const _V_D = [
+  [0,1,2,3,4,5,6,7,8,9],[1,2,3,4,0,6,7,8,9,5],[2,3,4,0,1,7,8,9,5,6],
+  [3,4,0,1,2,8,9,5,6,7],[4,0,1,2,3,9,5,6,7,8],[5,9,8,7,6,0,4,3,2,1],
+  [6,5,9,8,7,1,0,4,3,2],[7,6,5,9,8,2,1,0,4,3],[8,7,6,5,9,3,2,1,0,4],
+  [9,8,7,6,5,4,3,2,1,0],
+];
+const _V_P = [
+  [0,1,2,3,4,5,6,7,8,9],[1,5,7,6,2,8,3,0,9,4],[5,8,0,3,7,9,6,1,4,2],
+  [8,9,1,6,0,4,3,5,2,7],[9,4,5,3,1,2,6,8,7,0],[4,2,8,6,5,7,3,9,0,1],
+  [2,7,9,3,8,0,6,4,1,5],[7,0,4,6,9,1,3,2,5,8],
+];
+const _V_INV = [0,4,3,2,1,5,6,7,8,9];
+
+function _verhoeffChecksum(numStr) {
+  const digits = numStr.split("").reverse().map(Number);
+  let c = 0;
+  for (let i = 0; i < digits.length; i++) {
+    c = _V_D[c][_V_P[(i + 1) % 8][digits[i]]];
+  }
+  return _V_INV[c];
+}
+
+function _computeManualCode(discriminator, passcode) {
+  const shortDisc = (discriminator >> 8) & 0xF;
+  const digit1 = String((shortDisc >> 2) & 0x3);
+  const digits2_6 = String(((shortDisc & 0x3) << 14) | (passcode & 0x3FFF)).padStart(5, "0");
+  const digits7_10 = String((passcode >> 14) & 0x1FFF).padStart(4, "0");
+  const first10 = digit1 + digits2_6 + digits7_10;
+  return first10 + String(_verhoeffChecksum(first10));
+}
+
+function deriveNumericCode(mtString) {
+  try {
+    const info = _decodeMatterQR(mtString);
+    if (!info || !info.passcode) return null;
+    return _computeManualCode(info.discriminator, info.passcode);
+  } catch (e) {
+    return null;
+  }
+}
+
+function formatNumericCode(code) {
+  if (!code || code.length !== 11) return code || "";
+  return code.substring(0, 4) + "-" + code.substring(4, 7) + "-" + code.substring(7);
+}
+
+// --- Translations ---
+const TRANSLATIONS = {
+  en: {
+    title: "Matter Code Organizer",
+    add: "Add Device",
+    scan: "Scan QR Code",
+    search: "Search devices\u2026",
+    name: "Device Name",
+    matterQr: "Matter QR Code (MT:\u2026)",
+    numericCode: "Numeric Setup Code",
+    manufacturer: "Manufacturer",
+    model: "Model",
+    save: "Save",
+    cancel: "Cancel",
+    edit: "Edit",
+    delete: "Delete",
+    copyCode: "Copy numeric code",
+    copied: "Copied!",
+    noDevices: "No devices yet. Add your first Matter device code.",
+    noResults: "No devices match your search.",
+    confirmDelete: "Delete this device?",
+    scanTitle: "Scan Matter QR Code",
+    scanHint: "Point your camera at a Matter QR code",
+    scanStop: "Stop Scanning",
+    cameraError: "Could not access camera. Make sure HTTPS is enabled and camera permission is granted.",
+    nameRequired: "Device name is required.",
+    codeRequired: "Please enter a QR code or numeric code.",
+    editDevice: "Edit Device",
+    addDevice: "Add Device",
+    linkDevice: "Link to Home Assistant device",
+    linkNone: "-- No link --",
+    autoNumeric: "Auto-computed from QR code",
+  },
+  de: {
+    title: "Matter Code Organizer",
+    add: "Gerät hinzufügen",
+    scan: "QR-Code scannen",
+    search: "Geräte suchen\u2026",
+    name: "Gerätename",
+    matterQr: "Matter QR-Code (MT:\u2026)",
+    numericCode: "Numerischer Setup-Code",
+    manufacturer: "Hersteller",
+    model: "Modell",
+    save: "Speichern",
+    cancel: "Abbrechen",
+    edit: "Bearbeiten",
+    delete: "Löschen",
+    copyCode: "Numerischen Code kopieren",
+    copied: "Kopiert!",
+    noDevices: "Noch keine Geräte. Fügen Sie Ihren ersten Matter-Gerätecode hinzu.",
+    noResults: "Keine Geräte entsprechen Ihrer Suche.",
+    confirmDelete: "Dieses Gerät löschen?",
+    scanTitle: "Matter QR-Code scannen",
+    scanHint: "Richten Sie Ihre Kamera auf einen Matter QR-Code",
+    scanStop: "Scan beenden",
+    cameraError: "Kamerazugriff nicht möglich. Stellen Sie sicher, dass HTTPS aktiviert ist und die Kameraberechtigung erteilt wurde.",
+    nameRequired: "Gerätename ist erforderlich.",
+    codeRequired: "Bitte geben Sie einen QR-Code oder numerischen Code ein.",
+    editDevice: "Gerät bearbeiten",
+    addDevice: "Gerät hinzufügen",
+    linkDevice: "Mit Home Assistant Gerät verknüpfen",
+    linkNone: "-- Keine Verknüpfung --",
+    autoNumeric: "Automatisch aus QR-Code berechnet",
+  },
+};
+
+class MatterCodePanel extends HTMLElement {
+  constructor() {
+    super();
+    this.attachShadow({ mode: "open" });
+    this._devices = [];
+    this._searchQuery = "";
+    this._editingDevice = null;
+    this._scanning = false;
+    this._stream = null;
+    this._scanAnimFrame = null;
+    this._copiedId = null;
+    this._matterHADevices = [];
+  }
+
+  set hass(hass) {
+    this._hass = hass;
+    if (!this._initialized) {
+      this._initialized = true;
+      this._lang = (hass.language || "en").substring(0, 2);
+      if (!TRANSLATIONS[this._lang]) this._lang = "en";
+      this._loadDevices();
+      this._loadMatterHADevices();
+    }
+  }
+
+  set panel(panel) {
+    this._panel = panel;
+  }
+
+  _t(key) {
+    return TRANSLATIONS[this._lang]?.[key] || TRANSLATIONS.en[key] || key;
+  }
+
+  async _loadDevices() {
+    try {
+      const result = await this._hass.callWS({
+        type: "matter_code_organizer/devices",
+      });
+      this._devices = result.devices || [];
+    } catch (e) {
+      console.error("Failed to load devices:", e);
+      this._devices = [];
+    }
+    this._render();
+  }
+
+  async _loadMatterHADevices() {
+    try {
+      const allDevices = await this._hass.callWS({
+        type: "config/device_registry/list",
+      });
+      this._matterHADevices = (allDevices || []).filter(
+        (d) => d && d.identifiers && d.identifiers.some(([domain]) => domain === "matter")
+      );
+    } catch (e) {
+      console.error("Failed to load HA Matter devices:", e);
+      this._matterHADevices = [];
+    }
+  }
+
+  async _addDevice(name, matterQrCode, numericCode, manufacturer, model) {
+    await this._hass.callWS({
+      type: "matter_code_organizer/add_device",
+      name,
+      matter_qr_code: matterQrCode,
+      numeric_code: numericCode,
+      manufacturer: manufacturer || "",
+      model: model || "",
+    });
+    await this._loadDevices();
+  }
+
+  async _updateDevice(id, name, matterQrCode, numericCode, manufacturer, model) {
+    await this._hass.callWS({
+      type: "matter_code_organizer/update_device",
+      device_id: id,
+      name,
+      matter_qr_code: matterQrCode,
+      numeric_code: numericCode,
+      manufacturer: manufacturer || "",
+      model: model || "",
+    });
+    await this._loadDevices();
+  }
+
+  async _deleteDevice(id) {
+    await this._hass.callWS({
+      type: "matter_code_organizer/delete_device",
+      device_id: id,
+    });
+    await this._loadDevices();
+  }
+
+  get _filteredDevices() {
+    if (!this._searchQuery) return this._devices;
+    const q = this._searchQuery.toLowerCase();
+    return this._devices.filter(
+      (d) =>
+        (d.name && d.name.toLowerCase().includes(q)) ||
+        (d.matter_qr_code && d.matter_qr_code.toLowerCase().includes(q)) ||
+        (d.numeric_code && d.numeric_code.includes(q)) ||
+        (d.manufacturer && d.manufacturer.toLowerCase().includes(q)) ||
+        (d.model && d.model.toLowerCase().includes(q))
+    );
+  }
+
+  _generateQRCode(data, container) {
+    if (!data || !window.qrcode) return;
+    try {
+      const qr = window.qrcode(0, "M");
+      qr.addData(data);
+      qr.make();
+      container.innerHTML = qr.createSvgTag(4, 0);
+    } catch (e) {
+      container.innerHTML = "";
+      console.error("QR generation error:", e);
+    }
+  }
+
+  _getDecodedInfo(mtCode) {
+    if (!mtCode) return null;
+    try {
+      return _decodeMatterQR(mtCode);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  _render() {
+    const devices = this._filteredDevices;
+
+    this.shadowRoot.innerHTML = `
+      <style>
+        :host {
+          display: block;
+          --primary-color: var(--ha-card-header-color, #03a9f4);
+          --text-color: var(--primary-text-color, #212121);
+          --secondary-text: var(--secondary-text-color, #727272);
+          --card-bg: var(--ha-card-background, var(--card-background-color, #fff));
+          --divider: var(--divider-color, #e0e0e0);
+          font-family: var(--paper-font-body1_-_font-family, "Roboto", sans-serif);
+          color: var(--text-color);
+          background: var(--primary-background-color, #fafafa);
+          min-height: 100vh;
+        }
+        .toolbar {
+          background: var(--app-header-background-color, var(--primary-color));
+          color: var(--app-header-text-color, #fff);
+          padding: 16px 16px 16px 24px;
+          display: flex; align-items: center; justify-content: space-between;
+          font-size: 20px; font-weight: 400; box-sizing: border-box;
+        }
+        .toolbar-title { flex: 1; }
+        .toolbar-actions { display: flex; gap: 8px; }
+        .toolbar-actions button {
+          background: rgba(255,255,255,0.2); border: none; color: inherit;
+          padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 14px;
+          display: flex; align-items: center; gap: 6px;
+        }
+        .toolbar-actions button:hover { background: rgba(255,255,255,0.3); }
+        .content { max-width: 900px; margin: 0 auto; padding: 16px; }
+        .search-bar { margin-bottom: 16px; }
+        .search-bar input {
+          width: 100%; padding: 12px 16px; border: 1px solid var(--divider);
+          border-radius: 8px; font-size: 16px; background: var(--card-bg);
+          color: var(--text-color); box-sizing: border-box; outline: none;
+        }
+        .search-bar input:focus { border-color: var(--primary-color); }
+        .device-card {
+          background: var(--card-bg); border-radius: 12px; padding: 20px;
+          margin-bottom: 16px;
+          box-shadow: var(--ha-card-box-shadow, 0 2px 6px rgba(0,0,0,0.1));
+          display: flex; gap: 20px; align-items: flex-start; position: relative;
+        }
+        .device-qr {
+          flex-shrink: 0; width: 120px; height: 120px;
+          display: flex; align-items: center; justify-content: center;
+          background: #fff; border-radius: 8px; border: 1px solid var(--divider);
+        }
+        .device-qr svg { width: 112px; height: 112px; }
+        .device-info { flex: 1; min-width: 0; }
+        .device-name { font-size: 18px; font-weight: 500; margin-bottom: 4px; }
+        .device-manufacturer {
+          font-size: 13px; color: var(--secondary-text); margin-bottom: 8px;
+        }
+        .device-code {
+          font-family: "Roboto Mono", monospace; font-size: 13px;
+          color: var(--secondary-text); word-break: break-all; margin-bottom: 4px;
+        }
+        .device-actions { position: absolute; top: 12px; right: 12px; }
+        .menu-btn {
+          background: none; border: none; cursor: pointer;
+          padding: 8px; border-radius: 50%; color: var(--secondary-text); font-size: 20px;
+        }
+        .menu-btn:hover { background: rgba(0,0,0,0.05); }
+        .dropdown {
+          position: absolute; right: 0; top: 36px; background: var(--card-bg);
+          border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+          z-index: 10; overflow: hidden; min-width: 140px;
+        }
+        .dropdown button {
+          display: block; width: 100%; padding: 12px 16px; border: none;
+          background: none; text-align: left; cursor: pointer;
+          font-size: 14px; color: var(--text-color);
+        }
+        .dropdown button:hover { background: rgba(0,0,0,0.05); }
+        .dropdown button.danger { color: #c62828; }
+        .copy-btn {
+          background: none; border: 1px solid var(--divider); border-radius: 4px;
+          padding: 2px 8px; cursor: pointer; font-size: 12px;
+          color: var(--secondary-text); margin-left: 8px; vertical-align: middle;
+        }
+        .copy-btn:hover { background: rgba(0,0,0,0.05); }
+        .empty-state {
+          text-align: center; padding: 60px 20px;
+          color: var(--secondary-text); font-size: 16px;
+        }
+        .overlay {
+          position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+          z-index: 100; display: flex; align-items: center; justify-content: center;
+        }
+        .dialog {
+          background: var(--card-bg); border-radius: 12px; padding: 24px;
+          width: 90%; max-width: 500px; box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+          max-height: 90vh; overflow-y: auto;
+        }
+        .dialog h2 { margin: 0 0 20px 0; font-size: 20px; font-weight: 500; }
+        .form-field { margin-bottom: 16px; }
+        .form-field label {
+          display: block; margin-bottom: 4px; font-size: 13px; color: var(--secondary-text);
+        }
+        .form-field input, .form-field select {
+          width: 100%; padding: 10px 12px; border: 1px solid var(--divider);
+          border-radius: 6px; font-size: 15px;
+          background: var(--primary-background-color, #fafafa);
+          color: var(--text-color); box-sizing: border-box; outline: none;
+        }
+        .form-field input:focus, .form-field select:focus { border-color: var(--primary-color); }
+        .form-hint {
+          font-size: 12px; color: var(--secondary-text); margin-top: 4px; font-style: italic;
+        }
+        .form-error { color: #c62828; font-size: 13px; margin-bottom: 12px; }
+        .dialog-actions {
+          display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px;
+        }
+        .dialog-actions button {
+          padding: 10px 24px; border-radius: 6px; border: none; cursor: pointer; font-size: 14px;
+        }
+        .btn-cancel { background: transparent; color: var(--text-color); }
+        .btn-cancel:hover { background: rgba(0,0,0,0.05); }
+        .btn-save { background: var(--primary-color); color: #fff; }
+        .btn-save:hover { opacity: 0.9; }
+        .scanner-container { position: relative; }
+        .scanner-container video { width: 100%; border-radius: 8px; background: #000; }
+        .scanner-hint { text-align: center; margin: 12px 0; color: var(--secondary-text); font-size: 14px; }
+        .no-qr-placeholder {
+          width: 120px; height: 120px; display: flex; align-items: center;
+          justify-content: center; color: var(--secondary-text); font-size: 13px; text-align: center;
+        }
+        @media (max-width: 600px) {
+          .device-card { flex-direction: column; align-items: center; text-align: center; }
+          .device-info { width: 100%; }
+          .toolbar { padding: 12px; font-size: 18px; }
+          .toolbar-actions button span.btn-text { display: none; }
+        }
+      </style>
+
+      <div class="toolbar">
+        <div class="toolbar-title">${this._t("title")}</div>
+        <div class="toolbar-actions">
+          <button id="btn-scan">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M9.5 6.5v3h-3v-3h3M11 5H5v6h6V5zm-1.5 9.5v3h-3v-3h3M11 13H5v6h6v-6zm6.5-6.5v3h-3v-3h3M19 5h-6v6h6V5zm-6 8h1.5v1.5H13V13zm1.5 1.5H16V16h-1.5v-1.5zM16 13h1.5v1.5H16V13zm-3 3h1.5v1.5H13V16zm1.5 1.5H16V19h-1.5v-1.5zM16 16h1.5v1.5H16V16zm1.5-1.5H19V16h-1.5v-1.5zm0 3H19V19h-1.5v-1.5z"/></svg>
+            <span class="btn-text">${this._t("scan")}</span>
+          </button>
+          <button id="btn-add">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+            <span class="btn-text">${this._t("add")}</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="content">
+        ${this._devices.length > 0
+          ? `<div class="search-bar">
+              <input type="text" id="search-input" placeholder="${this._t("search")}" value="${this._escHtml(this._searchQuery)}">
+            </div>`
+          : ""}
+
+        ${devices.length === 0
+          ? `<div class="empty-state">${this._t(this._searchQuery ? "noResults" : "noDevices")}</div>`
+          : devices.map((d) => {
+              const decoded = this._getDecodedInfo(d.matter_qr_code);
+              const displayNumeric = d.numeric_code || (decoded ? _computeManualCode(decoded.discriminator, decoded.passcode) : "");
+              const mfr = d.manufacturer || "";
+              const mdl = d.model || "";
+              const mfrLine = mfr ? (mdl ? mfr + " " + mdl : mfr) : mdl;
+              return `
+                <div class="device-card" data-id="${d.id}">
+                  ${d.matter_qr_code
+                    ? `<div class="device-qr" data-qr="${this._escHtml(d.matter_qr_code)}"></div>`
+                    : `<div class="device-qr"><div class="no-qr-placeholder">No QR Code</div></div>`}
+                  <div class="device-info">
+                    <div class="device-name">${this._escHtml(d.name)}</div>
+                    ${mfrLine ? `<div class="device-manufacturer">${this._escHtml(mfrLine)}</div>` : ""}
+                    ${d.matter_qr_code ? `<div class="device-code">${this._escHtml(d.matter_qr_code)}</div>` : ""}
+                    ${displayNumeric
+                      ? `<div class="device-code">
+                          ${this._escHtml(formatNumericCode(displayNumeric))}
+                          <button class="copy-btn" data-copy="${this._escHtml(displayNumeric)}" title="${this._t("copyCode")}">
+                            ${this._copiedId === d.id ? this._t("copied") : "\u{1F4CB}"}
+                          </button>
+                        </div>`
+                      : ""}
+                  </div>
+                  <div class="device-actions">
+                    <button class="menu-btn" data-menu="${d.id}">\u22EE</button>
+                  </div>
+                </div>`;
+            }).join("")}
+      </div>
+
+      ${this._renderDialog()}
+    `;
+
+    _scriptsReady.then(() => {
+      this.shadowRoot.querySelectorAll(".device-qr[data-qr]").forEach((el) => {
+        this._generateQRCode(el.dataset.qr, el);
+      });
+    });
+
+    this._bindEvents();
+  }
+
+  _renderDialog() {
+    if (this._scanning) {
+      return `
+        <div class="overlay" id="overlay">
+          <div class="dialog">
+            <h2>${this._t("scanTitle")}</h2>
+            <div class="scanner-container">
+              <video id="scanner-video" autoplay playsinline></video>
+              <canvas id="scanner-canvas" style="display:none;"></canvas>
+            </div>
+            <div class="scanner-hint">${this._t("scanHint")}</div>
+            <div class="form-error" id="scan-error" style="display:none;"></div>
+            <div class="dialog-actions">
+              <button class="btn-cancel" id="btn-scan-stop">${this._t("scanStop")}</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    if (!this._editingDevice) return "";
+
+    const d = this._editingDevice;
+    const isEdit = !!(d && d.id);
+    const qrVal = (d && d.matter_qr_code) || "";
+    const derivedNumeric = deriveNumericCode(qrVal);
+    const numericVal = (d && d.numeric_code) || "";
+    const showAutoHint = !numericVal && derivedNumeric;
+
+    return `
+      <div class="overlay" id="overlay">
+        <div class="dialog">
+          <h2>${this._t(isEdit ? "editDevice" : "addDevice")}</h2>
+          <div class="form-error" id="form-error" style="display:none;"></div>
+
+          <div class="form-field">
+            <label>${this._t("linkDevice")}</label>
+            <select id="field-ha-device">
+              <option value="">${this._t("linkNone")}</option>
+              ${(this._matterHADevices || []).map((dev) => {
+                if (!dev) return "";
+                const devName = dev.name_by_user || dev.name || "Unknown";
+                const extra = dev.manufacturer ? ` (${dev.manufacturer}${dev.model ? " " + dev.model : ""})` : "";
+                return `<option value="${this._escHtml(dev.id)}">${this._escHtml(devName + extra)}</option>`;
+              }).join("")}
+            </select>
+          </div>
+
+          <div class="form-field">
+            <label>${this._t("name")}</label>
+            <input type="text" id="field-name" value="${this._escHtml((d && d.name) || "")}" />
+          </div>
+          <div class="form-field">
+            <label>${this._t("manufacturer")}</label>
+            <input type="text" id="field-manufacturer" value="${this._escHtml((d && d.manufacturer) || "")}" />
+          </div>
+          <div class="form-field">
+            <label>${this._t("model")}</label>
+            <input type="text" id="field-model" value="${this._escHtml((d && d.model) || "")}" />
+          </div>
+          <div class="form-field">
+            <label>${this._t("matterQr")}</label>
+            <input type="text" id="field-qr" value="${this._escHtml(qrVal)}" placeholder="MT:..." />
+          </div>
+          <div class="form-field">
+            <label>${this._t("numericCode")}</label>
+            <input type="text" id="field-numeric" value="${this._escHtml(numericVal)}"
+              placeholder="${derivedNumeric ? formatNumericCode(derivedNumeric) : ""}" inputmode="numeric" />
+            ${showAutoHint ? `<div class="form-hint">${this._t("autoNumeric")}</div>` : ""}
+          </div>
+          <div class="dialog-actions">
+            <button class="btn-cancel" id="btn-dialog-cancel">${this._t("cancel")}</button>
+            <button class="btn-save" id="btn-dialog-save">${this._t("save")}</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  _bindEvents() {
+    const $ = (sel) => this.shadowRoot.querySelector(sel);
+    const $$ = (sel) => this.shadowRoot.querySelectorAll(sel);
+
+    $("#btn-add")?.addEventListener("click", () => {
+      this._editingDevice = { name: "", matter_qr_code: "", numeric_code: "", manufacturer: "", model: "" };
+      this._render();
+    });
+
+    $("#btn-scan")?.addEventListener("click", () => {
+      this._scanning = true;
+      this._editingDevice = null;
+      this._render();
+      this._startScanner();
+    });
+
+    $("#search-input")?.addEventListener("input", (e) => {
+      this._searchQuery = e.target.value;
+      this._render();
+    });
+
+    $$(".copy-btn").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const text = btn.dataset.copy;
+        const card = btn.closest(".device-card");
+        if (!card) return;
+        navigator.clipboard.writeText(text).then(() => {
+          this._copiedId = card.dataset.id;
+          this._render();
+          setTimeout(() => { this._copiedId = null; this._render(); }, 1500);
+        });
+      });
+    });
+
+    $$(".menu-btn").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const id = btn.dataset.menu;
+        if (!id) return;
+        const existing = this.shadowRoot.querySelector(`.dropdown[data-for="${id}"]`);
+        if (existing) { existing.remove(); return; }
+        $$(".dropdown").forEach((d) => d.remove());
+        const dd = document.createElement("div");
+        dd.className = "dropdown";
+        dd.dataset.for = id;
+        dd.innerHTML = `
+          <button class="edit-btn">${this._t("edit")}</button>
+          <button class="delete-btn danger">${this._t("delete")}</button>
+        `;
+        btn.parentElement.appendChild(dd);
+        dd.querySelector(".edit-btn").addEventListener("click", () => {
+          const device = this._devices.find((d) => d.id === id);
+          if (device) { this._editingDevice = { ...device }; this._render(); }
+        });
+        dd.querySelector(".delete-btn").addEventListener("click", () => {
+          if (confirm(this._t("confirmDelete"))) this._deleteDevice(id);
+        });
+      });
+    });
+
+    this.shadowRoot.addEventListener("click", (e) => {
+      if (!e.target.closest(".menu-btn") && !e.target.closest(".dropdown")) {
+        $$(".dropdown").forEach((d) => d.remove());
+      }
+    });
+
+    $("#btn-dialog-cancel")?.addEventListener("click", () => {
+      this._editingDevice = null;
+      this._render();
+    });
+
+    $("#btn-dialog-save")?.addEventListener("click", () => this._handleSave());
+
+    // HA device dropdown - auto-fill name, manufacturer, model
+    $("#field-ha-device")?.addEventListener("change", (e) => {
+      const devId = e.target.value;
+      if (!devId) return;
+      const haDev = this._matterHADevices.find((d) => d && d.id === devId);
+      if (!haDev) return;
+
+      const nameField = $("#field-name");
+      const mfrField = $("#field-manufacturer");
+      const modelField = $("#field-model");
+
+      if (nameField) nameField.value = haDev.name_by_user || haDev.name || "";
+      if (mfrField) mfrField.value = haDev.manufacturer || "";
+      if (modelField) modelField.value = haDev.model || "";
+    });
+
+    // QR field - auto-compute numeric on input
+    $("#field-qr")?.addEventListener("input", (e) => {
+      const qr = e.target.value.trim();
+      const numericField = $("#field-numeric");
+      if (numericField && qr.startsWith("MT:")) {
+        const derived = deriveNumericCode(qr);
+        if (derived) {
+          numericField.placeholder = formatNumericCode(derived);
+          const hint = numericField.parentElement.querySelector(".form-hint");
+          if (!hint && !numericField.value.trim()) {
+            const h = document.createElement("div");
+            h.className = "form-hint";
+            h.textContent = this._t("autoNumeric");
+            numericField.parentElement.appendChild(h);
+          }
+        }
+      }
+    });
+
+    $$("#field-name, #field-qr, #field-numeric").forEach((input) => {
+      input?.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") this._handleSave();
+      });
+    });
+
+    $("#overlay")?.addEventListener("click", (e) => {
+      if (e.target.id === "overlay") {
+        this._stopScanner();
+        this._editingDevice = null;
+        this._scanning = false;
+        this._render();
+      }
+    });
+
+    $("#btn-scan-stop")?.addEventListener("click", () => {
+      this._stopScanner();
+      this._scanning = false;
+      this._render();
+    });
+  }
+
+  async _handleSave() {
+    const $ = (sel) => this.shadowRoot.querySelector(sel);
+    const name = ($("#field-name")?.value || "").trim();
+    const qr = ($("#field-qr")?.value || "").trim();
+    let numeric = ($("#field-numeric")?.value || "").trim();
+    const manufacturer = ($("#field-manufacturer")?.value || "").trim();
+    const model = ($("#field-model")?.value || "").trim();
+    const errorEl = $("#form-error");
+
+    if (!name) {
+      if (errorEl) { errorEl.textContent = this._t("nameRequired"); errorEl.style.display = "block"; }
+      return;
+    }
+    if (!qr && !numeric) {
+      if (errorEl) { errorEl.textContent = this._t("codeRequired"); errorEl.style.display = "block"; }
+      return;
+    }
+
+    // Auto-derive numeric code from QR if not manually entered
+    if (!numeric && qr) {
+      const derived = deriveNumericCode(qr);
+      if (derived) numeric = derived;
+    }
+
+    try {
+      if (this._editingDevice && this._editingDevice.id) {
+        await this._updateDevice(this._editingDevice.id, name, qr, numeric, manufacturer, model);
+      } else {
+        await this._addDevice(name, qr, numeric, manufacturer, model);
+      }
+      this._editingDevice = null;
+    } catch (e) {
+      console.error("Save error:", e);
+      if (errorEl) { errorEl.textContent = e.message || "Error saving device"; errorEl.style.display = "block"; }
+    }
+  }
+
+  async _startScanner() {
+    await _scriptsReady;
+    const video = this.shadowRoot.querySelector("#scanner-video");
+    const canvas = this.shadowRoot.querySelector("#scanner-canvas");
+    const errorEl = this.shadowRoot.querySelector("#scan-error");
+
+    if (!video || !canvas) return;
+
+    try {
+      this._stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment" },
+      });
+      video.srcObject = this._stream;
+      video.play();
+
+      const ctx = canvas.getContext("2d", { willReadFrequently: true });
+
+      const scan = () => {
+        if (!this._scanning || !this._stream) return;
+
+        if (video.readyState === video.HAVE_ENOUGH_DATA) {
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+          if (window.jsQR) {
+            const code = window.jsQR(imageData.data, imageData.width, imageData.height, {
+              inversionAttempts: "dontInvert",
+            });
+
+            if (code && code.data && code.data.startsWith("MT:")) {
+              this._stopScanner();
+              this._scanning = false;
+              const derived = deriveNumericCode(code.data);
+              this._editingDevice = {
+                name: "",
+                matter_qr_code: code.data,
+                numeric_code: derived || "",
+                manufacturer: "",
+                model: "",
+              };
+              this._render();
+              return;
+            }
+          }
+        }
+
+        this._scanAnimFrame = requestAnimationFrame(scan);
+      };
+
+      this._scanAnimFrame = requestAnimationFrame(scan);
+    } catch (e) {
+      console.error("Camera error:", e);
+      if (errorEl) {
+        errorEl.textContent = this._t("cameraError");
+        errorEl.style.display = "block";
+      }
+    }
+  }
+
+  _stopScanner() {
+    if (this._scanAnimFrame) {
+      cancelAnimationFrame(this._scanAnimFrame);
+      this._scanAnimFrame = null;
+    }
+    if (this._stream) {
+      this._stream.getTracks().forEach((t) => t.stop());
+      this._stream = null;
+    }
+  }
+
+  _escHtml(str) {
+    if (!str) return "";
+    const div = document.createElement("div");
+    div.textContent = str;
+    return div.innerHTML;
+  }
+}
+
+customElements.define("matter-code-panel", MatterCodePanel);

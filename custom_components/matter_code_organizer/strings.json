@@ -1,0 +1,13 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Matter Code Organizer",
+        "description": "This integration adds a sidebar panel for managing your Matter device pairing codes (QR codes and numeric setup codes)."
+      }
+    },
+    "abort": {
+      "already_configured": "Matter Code Organizer is already set up."
+    }
+  }
+}

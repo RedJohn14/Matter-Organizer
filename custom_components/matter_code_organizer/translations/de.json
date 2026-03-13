@@ -1,0 +1,13 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Matter Code Organizer",
+        "description": "Diese Integration fügt ein Seitenleisten-Panel zur Verwaltung Ihrer Matter-Geräte-Pairing-Codes (QR-Codes und numerische Setup-Codes) hinzu."
+      }
+    },
+    "abort": {
+      "already_configured": "Matter Code Organizer ist bereits eingerichtet."
+    }
+  }
+}

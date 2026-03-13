@@ -1,0 +1,12 @@
+{
+  "domain": "matter_code_organizer",
+  "name": "Matter Code Organizer",
+  "codeowners": [],
+  "config_flow": true,
+  "dependencies": ["http", "frontend", "panel_custom"],
+  "documentation": "https://github.com/...",
+  "iot_class": "local_push",
+  "issue_tracker": "https://github.com/.../issues",
+  "requirements": [],
+  "version": "1.0.0"
+}
