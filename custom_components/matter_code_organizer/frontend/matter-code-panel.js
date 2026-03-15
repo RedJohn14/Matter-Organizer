@@ -174,6 +174,9 @@ const TRANSLATIONS = {
     connectionEthernet: "Ethernet",
     exportPdf: "Export PDF",
     exportPdfTitle: "Matter Device Codes",
+    sortAZ: "A→Z",
+    sortZA: "Z→A",
+    filterAll: "All",
   },
   de: {
     title: "Matter Code Organizer",
@@ -222,6 +225,9 @@ const TRANSLATIONS = {
     connectionEthernet: "Ethernet",
     exportPdf: "PDF exportieren",
     exportPdfTitle: "Matter Gerätecodes",
+    sortAZ: "A→Z",
+    sortZA: "Z→A",
+    filterAll: "Alle",
   },
 };
 
@@ -239,6 +245,8 @@ class MatterCodePanel extends HTMLElement {
     this._matterHADevices = [];
     this._showImportDialog = false;
     this._importSelection = new Set();
+    this._sortAZ = true;
+    this._filterConnection = "";
   }
 
   set hass(hass) {
@@ -324,16 +332,27 @@ class MatterCodePanel extends HTMLElement {
   }
 
   get _filteredDevices() {
-    if (!this._searchQuery) return this._devices;
-    const q = this._searchQuery.toLowerCase();
-    return this._devices.filter(
-      (d) =>
-        (d.name && d.name.toLowerCase().includes(q)) ||
-        (d.matter_qr_code && d.matter_qr_code.toLowerCase().includes(q)) ||
-        (d.numeric_code && d.numeric_code.includes(q)) ||
-        (d.manufacturer && d.manufacturer.toLowerCase().includes(q)) ||
-        (d.model && d.model.toLowerCase().includes(q))
-    );
+    let result = this._devices;
+    if (this._searchQuery) {
+      const q = this._searchQuery.toLowerCase();
+      result = result.filter(
+        (d) =>
+          (d.name && d.name.toLowerCase().includes(q)) ||
+          (d.matter_qr_code && d.matter_qr_code.toLowerCase().includes(q)) ||
+          (d.numeric_code && d.numeric_code.includes(q)) ||
+          (d.manufacturer && d.manufacturer.toLowerCase().includes(q)) ||
+          (d.model && d.model.toLowerCase().includes(q))
+      );
+    }
+    if (this._filterConnection) {
+      result = result.filter((d) => d.connection_type === this._filterConnection);
+    }
+    result = [...result].sort((a, b) => {
+      const nameA = (a.name || "").toLowerCase();
+      const nameB = (b.name || "").toLowerCase();
+      return this._sortAZ ? nameA.localeCompare(nameB) : nameB.localeCompare(nameA);
+    });
+    return result;
   }
 
   _generateQRCode(data, container) {
@@ -407,6 +426,22 @@ class MatterCodePanel extends HTMLElement {
           color: var(--text-color); box-sizing: border-box; outline: none;
         }
         .search-bar input:focus { border-color: var(--primary-color); }
+        .controls-row {
+          display: flex; gap: 8px; margin-bottom: 16px; align-items: center;
+        }
+        .sort-btn {
+          background: var(--card-bg); border: 1px solid var(--divider);
+          border-radius: 8px; padding: 8px 14px; font-size: 14px;
+          color: var(--text-color); cursor: pointer; white-space: nowrap;
+          font-family: inherit;
+        }
+        .sort-btn:hover { border-color: var(--primary-color); }
+        .filter-select {
+          flex: 1; padding: 8px 12px; border: 1px solid var(--divider);
+          border-radius: 8px; font-size: 14px; background: var(--card-bg);
+          color: var(--text-color); font-family: inherit; outline: none;
+        }
+        .filter-select:focus { border-color: var(--primary-color); }
         .device-card {
           background: var(--card-bg); border-radius: 12px; padding: 20px;
           margin-bottom: 16px;
@@ -598,6 +633,16 @@ class MatterCodePanel extends HTMLElement {
         ${this._devices.length > 0
           ? `<div class="search-bar">
               <input type="text" id="search-input" placeholder="${this._t("search")}" value="${this._escHtml(this._searchQuery)}">
+            </div>
+            <div class="controls-row">
+              <button class="sort-btn" id="btn-sort">${this._sortAZ ? this._t("sortAZ") : this._t("sortZA")}</button>
+              <select class="filter-select" id="filter-connection">
+                <option value="">${this._t("filterAll")}</option>
+                <option value="thread"${this._filterConnection === "thread" ? " selected" : ""}>${this._t("connectionThread")}</option>
+                <option value="wifi"${this._filterConnection === "wifi" ? " selected" : ""}>${this._t("connectionWifi")}</option>
+                <option value="bluetooth"${this._filterConnection === "bluetooth" ? " selected" : ""}>${this._t("connectionBluetooth")}</option>
+                <option value="ethernet"${this._filterConnection === "ethernet" ? " selected" : ""}>${this._t("connectionEthernet")}</option>
+              </select>
             </div>`
           : ""}
 
@@ -827,6 +872,16 @@ class MatterCodePanel extends HTMLElement {
 
     $("#search-input")?.addEventListener("input", (e) => {
       this._searchQuery = e.target.value;
+      this._render();
+    });
+
+    $("#btn-sort")?.addEventListener("click", () => {
+      this._sortAZ = !this._sortAZ;
+      this._render();
+    });
+
+    $("#filter-connection")?.addEventListener("change", (e) => {
+      this._filterConnection = e.target.value;
       this._render();
     });
 
