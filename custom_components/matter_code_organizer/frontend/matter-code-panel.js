@@ -23,6 +23,8 @@ const _scriptsReady = Promise.all([
   _loadScript(`${BASE_PATH}/jsQR.min.js`),
 ]);
 
+const _jspdfReady = _loadScript(`${BASE_PATH}/jspdf.umd.min.js`);
+
 // --- Matter QR Code Decoder ---
 
 const BASE38_CHARS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ-.";
@@ -170,6 +172,8 @@ const TRANSLATIONS = {
     connectionWifi: "Wi-Fi",
     connectionBluetooth: "Bluetooth",
     connectionEthernet: "Ethernet",
+    exportPdf: "Export PDF",
+    exportPdfTitle: "Matter Device Codes",
   },
   de: {
     title: "Matter Code Organizer",
@@ -216,6 +220,8 @@ const TRANSLATIONS = {
     connectionWifi: "WLAN",
     connectionBluetooth: "Bluetooth",
     connectionEthernet: "Ethernet",
+    exportPdf: "PDF exportieren",
+    exportPdfTitle: "Matter Gerätecodes",
   },
 };
 
@@ -551,6 +557,10 @@ class MatterCodePanel extends HTMLElement {
           <span class="version-badge">v${this._escHtml(this._version)}</span>
         </div>
         <div class="toolbar-actions">
+          <button id="btn-export-pdf" ${this._devices.length === 0 ? "disabled" : ""}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-8.5 7.5c0 .83-.67 1.5-1.5 1.5H9v2H7.5V7H10c.83 0 1.5.67 1.5 1.5v1zm5 2c0 .83-.67 1.5-1.5 1.5h-2.5V7H15c.83 0 1.5.67 1.5 1.5v3zm4-3H19v1h1.5V11H19v2h-1.5V7h3v1.5zM9 9.5h1v-1H9v1zM4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm10 5.5h1v-3h-1v3z"/></svg>
+            <span class="btn-text">${this._t("exportPdf")}</span>
+          </button>
           <button id="btn-import">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
             <span class="btn-text">${this._t("importDevices")}</span>
@@ -781,6 +791,8 @@ class MatterCodePanel extends HTMLElement {
       this._editingDevice = { name: "", matter_qr_code: "", numeric_code: "", manufacturer: "", model: "", ha_device_id: "", connection_type: "" };
       this._render();
     });
+
+    $("#btn-export-pdf")?.addEventListener("click", () => this._exportPdf());
 
     $("#btn-import")?.addEventListener("click", () => {
       this._showImportDialog = true;
@@ -1152,6 +1164,142 @@ class MatterCodePanel extends HTMLElement {
       this._stream.getTracks().forEach((t) => t.stop());
       this._stream = null;
     }
+  }
+
+  async _exportPdf() {
+    await _jspdfReady;
+    await _scriptsReady;
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    const devices = this._filteredDevices;
+    const pageW = 210;
+    const margin = 15;
+    const colW = (pageW - margin * 2 - 10) / 2; // two columns with 10mm gap
+    const qrSize = 28;
+
+    // Title
+    doc.setFontSize(18);
+    doc.text(this._t("exportPdfTitle"), pageW / 2, 18, { align: "center" });
+    doc.setFontSize(9);
+    doc.setTextColor(120);
+    doc.text(new Date().toLocaleDateString(), pageW / 2, 24, { align: "center" });
+    doc.setTextColor(0);
+
+    let col = 0;
+    let yPos = 32;
+    const cardH = 52; // height per device card
+    const pageH = 280;
+
+    for (const d of devices) {
+      if (yPos + cardH > pageH) {
+        doc.addPage();
+        yPos = 15;
+      }
+
+      const x = margin + col * (colW + 10);
+
+      // Card background
+      doc.setFillColor(245, 245, 245);
+      doc.setDrawColor(200);
+      doc.roundedRect(x, yPos, colW, cardH, 2, 2, "FD");
+
+      // QR code
+      let qrX = x + 3;
+      let textX = x + qrSize + 6;
+      let textW = colW - qrSize - 9;
+
+      if (d.matter_qr_code && window.qrcode) {
+        try {
+          const qr = window.qrcode(0, "M");
+          qr.addData(d.matter_qr_code);
+          qr.make();
+          const svgStr = qr.createSvgTag(4, 0);
+          // Convert SVG to data URL for PDF embedding
+          const svgBlob = new Blob([svgStr], { type: "image/svg+xml" });
+          const url = URL.createObjectURL(svgBlob);
+          const img = new Image();
+          await new Promise((resolve) => {
+            img.onload = resolve;
+            img.onerror = resolve;
+            img.src = url;
+          });
+          const canvas = document.createElement("canvas");
+          canvas.width = 200;
+          canvas.height = 200;
+          const ctx = canvas.getContext("2d");
+          ctx.fillStyle = "#fff";
+          ctx.fillRect(0, 0, 200, 200);
+          ctx.drawImage(img, 0, 0, 200, 200);
+          URL.revokeObjectURL(url);
+          const imgData = canvas.toDataURL("image/png");
+          doc.addImage(imgData, "PNG", qrX, yPos + 2, qrSize, qrSize);
+        } catch (e) {
+          console.error("PDF QR error:", e);
+        }
+      } else {
+        textX = x + 4;
+        textW = colW - 8;
+      }
+
+      // Device name
+      doc.setFontSize(11);
+      doc.setFont(undefined, "bold");
+      const nameLines = doc.splitTextToSize(d.name || "Unnamed", textW);
+      doc.text(nameLines.slice(0, 2), textX, yPos + 6);
+      doc.setFont(undefined, "normal");
+
+      // Connection type
+      let infoY = yPos + 6 + nameLines.slice(0, 2).length * 4.5;
+      if (d.connection_type) {
+        doc.setFontSize(8);
+        doc.setTextColor(80);
+        const connLabel = this._t("connection" + d.connection_type.charAt(0).toUpperCase() + d.connection_type.slice(1));
+        doc.text(connLabel, textX, infoY);
+        infoY += 4;
+      }
+
+      // Manufacturer / Model
+      const mfr = d.manufacturer || "";
+      const mdl = d.model || "";
+      const mfrLine = mfr ? (mdl ? mfr + " " + mdl : mfr) : mdl;
+      if (mfrLine) {
+        doc.setFontSize(8);
+        doc.setTextColor(100);
+        doc.text(doc.splitTextToSize(mfrLine, textW).slice(0, 1), textX, infoY);
+        infoY += 4;
+        doc.setTextColor(0);
+      }
+
+      // QR code string
+      if (d.matter_qr_code) {
+        doc.setFontSize(6.5);
+        doc.setTextColor(60);
+        doc.text(doc.splitTextToSize(d.matter_qr_code, textW).slice(0, 1), textX, infoY);
+        infoY += 3.5;
+      }
+
+      // Numeric code
+      const decoded = this._getDecodedInfo(d.matter_qr_code);
+      const displayNumeric = d.numeric_code || (decoded ? _computeManualCode(decoded.discriminator, decoded.passcode) : "");
+      if (displayNumeric) {
+        doc.setFontSize(9);
+        doc.setTextColor(0);
+        doc.setFont(undefined, "bold");
+        doc.text(formatNumericCode(displayNumeric), textX, infoY + 1);
+        doc.setFont(undefined, "normal");
+      }
+
+      doc.setTextColor(0);
+
+      // Advance to next position
+      col++;
+      if (col >= 2) {
+        col = 0;
+        yPos += cardH + 4;
+      }
+    }
+
+    doc.save("matter-devices.pdf");
   }
 
   _escHtml(str) {
