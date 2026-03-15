@@ -45,6 +45,13 @@ class MatterCodeStore:
         ha_device_id: str = "",
     ) -> dict[str, Any]:
         """Add a new device entry."""
+        # Duplicate detection
+        for existing in self._devices:
+            if matter_qr_code and existing.get("matter_qr_code") == matter_qr_code:
+                raise ValueError("Duplicate Matter QR code")
+            if numeric_code and existing.get("numeric_code") == numeric_code:
+                raise ValueError("Duplicate numeric code")
+
         now = datetime.now(timezone.utc).isoformat()
         device = {
             "id": str(uuid.uuid4()),

@@ -161,14 +161,18 @@ async def ws_get_devices(hass, connection, msg):
 async def ws_add_device(hass, connection, msg):
     """Add a new device."""
     store = hass.data[DOMAIN]["store"]
-    device = await store.async_add_device(
-        name=msg["name"],
-        matter_qr_code=msg.get("matter_qr_code", ""),
-        numeric_code=msg.get("numeric_code", ""),
-        manufacturer=msg.get("manufacturer", ""),
-        model=msg.get("model", ""),
-        ha_device_id=msg.get("ha_device_id", ""),
-    )
+    try:
+        device = await store.async_add_device(
+            name=msg["name"],
+            matter_qr_code=msg.get("matter_qr_code", ""),
+            numeric_code=msg.get("numeric_code", ""),
+            manufacturer=msg.get("manufacturer", ""),
+            model=msg.get("model", ""),
+            ha_device_id=msg.get("ha_device_id", ""),
+        )
+    except ValueError as exc:
+        connection.send_error(msg["id"], "duplicate", str(exc))
+        return
     entry = hass.data[DOMAIN]["entry"]
     await _sync_device_registry(hass, entry, store)
     connection.send_result(msg["id"], {"device": device})

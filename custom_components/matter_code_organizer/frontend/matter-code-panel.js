@@ -142,6 +142,7 @@ const TRANSLATIONS = {
     cameraError: "Could not access camera. Make sure HTTPS is enabled and camera permission is granted.",
     nameRequired: "Device name is required.",
     codeRequired: "Please enter a QR code or numeric code.",
+    duplicateCode: "This Matter code is already saved.",
     editDevice: "Edit Device",
     addDevice: "Add Device",
     linkDevice: "Link to Home Assistant device",
@@ -181,6 +182,7 @@ const TRANSLATIONS = {
     cameraError: "Kamerazugriff nicht möglich. Stellen Sie sicher, dass HTTPS aktiviert ist und die Kameraberechtigung erteilt wurde.",
     nameRequired: "Gerätename ist erforderlich.",
     codeRequired: "Bitte geben Sie einen QR-Code oder numerischen Code ein.",
+    duplicateCode: "Dieser Matter-Code ist bereits gespeichert.",
     editDevice: "Gerät bearbeiten",
     addDevice: "Gerät hinzufügen",
     linkDevice: "Mit Home Assistant Gerät verknüpfen",
@@ -890,6 +892,19 @@ class MatterCodePanel extends HTMLElement {
       if (derived) numeric = derived;
     }
 
+    // Duplicate detection for new devices
+    if (!this._editingDevice || !this._editingDevice.id) {
+      const isDuplicate = this._devices.some((d) => {
+        if (qr && d.matter_qr_code && d.matter_qr_code === qr) return true;
+        if (numeric && d.numeric_code && d.numeric_code === numeric) return true;
+        return false;
+      });
+      if (isDuplicate) {
+        if (errorEl) { errorEl.textContent = this._t("duplicateCode"); errorEl.style.display = "block"; }
+        return;
+      }
+    }
+
     try {
       if (this._editingDevice && this._editingDevice.id) {
         await this._updateDevice(this._editingDevice.id, name, qr, numeric, manufacturer, model, haDeviceId);
@@ -897,6 +912,7 @@ class MatterCodePanel extends HTMLElement {
         await this._addDevice(name, qr, numeric, manufacturer, model, haDeviceId);
       }
       this._editingDevice = null;
+      this._render();
     } catch (e) {
       console.error("Save error:", e);
       if (errorEl) { errorEl.textContent = e.message || "Error saving device"; errorEl.style.display = "block"; }
