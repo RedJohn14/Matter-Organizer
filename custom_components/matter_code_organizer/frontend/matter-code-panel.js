@@ -28,7 +28,7 @@ const _scriptsReady = Promise.all([
 const BASE38_CHARS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ-.";
 
 function _decodeMatterQR(mtString) {
-  let encoded = mtString;
+  let encoded = mtString.toUpperCase();
   if (encoded.startsWith("MT:")) encoded = encoded.substring(3);
 
   const bytes = [];
@@ -103,7 +103,7 @@ function _computeManualCode(discriminator, passcode) {
 function deriveNumericCode(mtString) {
   try {
     const info = _decodeMatterQR(mtString);
-    if (!info || !info.passcode) return null;
+    if (!info || info.passcode == null) return null;
     return _computeManualCode(info.discriminator, info.passcode);
   } catch (e) {
     return null;
@@ -831,7 +831,7 @@ class MatterCodePanel extends HTMLElement {
     $("#field-qr")?.addEventListener("input", (e) => {
       const qr = e.target.value.trim();
       const numericField = $("#field-numeric");
-      if (numericField && qr.startsWith("MT:")) {
+      if (numericField && qr.toUpperCase().startsWith("MT:")) {
         const derived = deriveNumericCode(qr);
         if (derived) {
           numericField.placeholder = formatNumericCode(derived);
