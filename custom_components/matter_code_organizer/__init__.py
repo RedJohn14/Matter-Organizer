@@ -161,6 +161,7 @@ async def ws_get_devices(hass, connection, msg):
         vol.Optional("manufacturer", default=""): str,
         vol.Optional("model", default=""): str,
         vol.Optional("ha_device_id", default=""): str,
+        vol.Optional("connection_type", default=""): str,
     }
 )
 @websocket_api.async_response
@@ -175,6 +176,7 @@ async def ws_add_device(hass, connection, msg):
             manufacturer=msg.get("manufacturer", ""),
             model=msg.get("model", ""),
             ha_device_id=msg.get("ha_device_id", ""),
+            connection_type=msg.get("connection_type", ""),
         )
     except ValueError as exc:
         connection.send_error(msg["id"], "duplicate", str(exc))
@@ -194,6 +196,7 @@ async def ws_add_device(hass, connection, msg):
         vol.Optional("manufacturer"): str,
         vol.Optional("model"): str,
         vol.Optional("ha_device_id"): str,
+        vol.Optional("connection_type"): str,
     }
 )
 @websocket_api.async_response
@@ -208,6 +211,7 @@ async def ws_update_device(hass, connection, msg):
         manufacturer=msg.get("manufacturer"),
         model=msg.get("model"),
         ha_device_id=msg.get("ha_device_id"),
+        connection_type=msg.get("connection_type"),
     )
     if device:
         entry = hass.data[DOMAIN]["entry"]

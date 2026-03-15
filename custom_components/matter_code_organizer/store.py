@@ -43,6 +43,7 @@ class MatterCodeStore:
         manufacturer: str = "",
         model: str = "",
         ha_device_id: str = "",
+        connection_type: str = "",
     ) -> dict[str, Any]:
         """Add a new device entry."""
         # Duplicate detection
@@ -61,6 +62,7 @@ class MatterCodeStore:
             "manufacturer": manufacturer,
             "model": model,
             "ha_device_id": ha_device_id,
+            "connection_type": connection_type,
             "created_at": now,
             "updated_at": now,
         }
@@ -77,6 +79,7 @@ class MatterCodeStore:
         manufacturer: str | None = None,
         model: str | None = None,
         ha_device_id: str | None = None,
+        connection_type: str | None = None,
     ) -> dict[str, Any] | None:
         """Update an existing device entry."""
         for device in self._devices:
@@ -93,6 +96,8 @@ class MatterCodeStore:
                     device["model"] = model
                 if ha_device_id is not None:
                     device["ha_device_id"] = ha_device_id
+                if connection_type is not None:
+                    device["connection_type"] = connection_type
                 device["updated_at"] = datetime.now(timezone.utc).isoformat()
                 await self.async_save()
                 return device

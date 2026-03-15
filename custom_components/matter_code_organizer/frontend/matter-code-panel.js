@@ -67,6 +67,14 @@ function _decodeMatterQR(mtString) {
   return { version, vendorId, productId, customFlow, discoveryCaps, discriminator, passcode };
 }
 
+// --- Connection type icons (16x16 inline SVGs) ---
+const CONNECTION_ICONS = {
+  thread: `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2.5"/><circle cx="5" cy="19" r="2.5"/><circle cx="19" cy="19" r="2.5"/><line x1="12" y1="7.5" x2="5" y2="16.5" stroke="currentColor" stroke-width="1.5" fill="none"/><line x1="12" y1="7.5" x2="19" y2="16.5" stroke="currentColor" stroke-width="1.5" fill="none"/><line x1="5" y1="19" x2="19" y2="19" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>`,
+  wifi: `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.08 2.93 1 9zm8 8l3 3 3-3c-1.65-1.66-4.34-1.66-6 0zm-4-4l2 2c2.76-2.76 7.24-2.76 10 0l2-2C15.14 9.14 8.87 9.14 5 13z"/></svg>`,
+  bluetooth: `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17.71 7.71L12 2h-1v7.59L6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 11 14.41V22h1l5.71-5.71-4.3-4.29 4.3-4.29zM13 5.83l1.88 1.88L13 9.59V5.83zm1.88 10.46L13 18.17v-3.76l1.88 1.88z"/></svg>`,
+  ethernet: `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M7.77 6.76L6.23 5.48.82 12l5.41 6.52 1.54-1.28L3.42 12l4.35-5.24zM7 13h2v-2H7v2zm10-2h-2v2h2v-2zm-6 2h2v-2h-2v2zm6.77-7.52l-1.54 1.28L20.58 12l-4.35 5.24 1.54 1.28L23.18 12l-5.41-6.52z"/></svg>`,
+};
+
 // --- Verhoeff checksum ---
 
 const _V_D = [
@@ -156,6 +164,12 @@ const TRANSLATIONS = {
     importSelected: "Import Selected",
     importAllDone: "All Matter devices are already imported.",
     linkedDevice: "Linked HA device",
+    connectionType: "Connection Type",
+    connectionNone: "-- None --",
+    connectionThread: "Thread",
+    connectionWifi: "Wi-Fi",
+    connectionBluetooth: "Bluetooth",
+    connectionEthernet: "Ethernet",
   },
   de: {
     title: "Matter Code Organizer",
@@ -196,6 +210,12 @@ const TRANSLATIONS = {
     importSelected: "Ausgewählte importieren",
     importAllDone: "Alle Matter-Geräte sind bereits importiert.",
     linkedDevice: "Verknüpftes HA-Gerät",
+    connectionType: "Verbindungstyp",
+    connectionNone: "-- Keine --",
+    connectionThread: "Thread",
+    connectionWifi: "WLAN",
+    connectionBluetooth: "Bluetooth",
+    connectionEthernet: "Ethernet",
   },
 };
 
@@ -262,7 +282,7 @@ class MatterCodePanel extends HTMLElement {
     }
   }
 
-  async _addDevice(name, matterQrCode, numericCode, manufacturer, model, haDeviceId) {
+  async _addDevice(name, matterQrCode, numericCode, manufacturer, model, haDeviceId, connectionType) {
     await this._hass.callWS({
       type: "matter_code_organizer/add_device",
       name,
@@ -271,10 +291,11 @@ class MatterCodePanel extends HTMLElement {
       manufacturer: manufacturer || "",
       model: model || "",
       ha_device_id: haDeviceId || "",
+      connection_type: connectionType || "",
     });
   }
 
-  async _updateDevice(id, name, matterQrCode, numericCode, manufacturer, model, haDeviceId) {
+  async _updateDevice(id, name, matterQrCode, numericCode, manufacturer, model, haDeviceId, connectionType) {
     await this._hass.callWS({
       type: "matter_code_organizer/update_device",
       device_id: id,
@@ -284,6 +305,7 @@ class MatterCodePanel extends HTMLElement {
       manufacturer: manufacturer || "",
       model: model || "",
       ha_device_id: haDeviceId || "",
+      connection_type: connectionType || "",
     });
   }
 
@@ -388,7 +410,12 @@ class MatterCodePanel extends HTMLElement {
         }
         .device-qr svg { width: 112px; height: 112px; }
         .device-info { flex: 1; min-width: 0; }
-        .device-name { font-size: 18px; font-weight: 500; margin-bottom: 4px; }
+        .device-name-row { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+        .device-name { font-size: 18px; font-weight: 500; }
+        .connection-icon {
+          display: inline-flex; align-items: center; justify-content: center;
+          width: 16px; height: 16px; color: var(--secondary-text); flex-shrink: 0;
+        }
         .device-manufacturer {
           font-size: 13px; color: var(--secondary-text); margin-bottom: 8px;
         }
@@ -504,6 +531,7 @@ class MatterCodePanel extends HTMLElement {
         }
         @media (max-width: 600px) {
           .device-card { flex-direction: column; align-items: center; text-align: center; }
+          .device-name-row { justify-content: center; }
           .device-info { width: 100%; }
           .hamburger-btn { display: flex; align-items: center; }
           .toolbar { padding: 12px; font-size: 18px; }
@@ -559,7 +587,10 @@ class MatterCodePanel extends HTMLElement {
                     ? `<div class="device-qr" data-qr="${this._escHtml(d.matter_qr_code)}"></div>`
                     : `<div class="device-qr"><div class="no-qr-placeholder">No QR Code</div></div>`}
                   <div class="device-info">
-                    <div class="device-name">${this._escHtml(d.name)}</div>
+                    <div class="device-name-row">
+                      <div class="device-name">${this._escHtml(d.name)}</div>
+                      ${d.connection_type && CONNECTION_ICONS[d.connection_type] ? `<span class="connection-icon" title="${this._t("connection" + d.connection_type.charAt(0).toUpperCase() + d.connection_type.slice(1))}">${CONNECTION_ICONS[d.connection_type]}</span>` : ""}
+                    </div>
                     ${mfrLine ? `<div class="device-manufacturer">${this._escHtml(mfrLine)}</div>` : ""}
                     ${d.matter_qr_code ? `<div class="device-code">${this._escHtml(d.matter_qr_code)}</div>` : ""}
                     ${displayNumeric
@@ -661,6 +692,16 @@ class MatterCodePanel extends HTMLElement {
             <input type="text" id="field-model" value="${this._escHtml((d && d.model) || "")}" />
           </div>
           <div class="form-field">
+            <label>${this._t("connectionType")}</label>
+            <select id="field-connection-type">
+              <option value="">${this._t("connectionNone")}</option>
+              <option value="thread"${(d && d.connection_type) === "thread" ? " selected" : ""}>${this._t("connectionThread")}</option>
+              <option value="wifi"${(d && d.connection_type) === "wifi" ? " selected" : ""}>${this._t("connectionWifi")}</option>
+              <option value="bluetooth"${(d && d.connection_type) === "bluetooth" ? " selected" : ""}>${this._t("connectionBluetooth")}</option>
+              <option value="ethernet"${(d && d.connection_type) === "ethernet" ? " selected" : ""}>${this._t("connectionEthernet")}</option>
+            </select>
+          </div>
+          <div class="form-field">
             <label>${this._t("matterQr")}</label>
             <div style="display:flex;gap:8px;">
               <input type="text" id="field-qr" value="${this._escHtml(qrVal)}" placeholder="MT:..." style="flex:1;" />
@@ -737,7 +778,7 @@ class MatterCodePanel extends HTMLElement {
     });
 
     $("#btn-add")?.addEventListener("click", () => {
-      this._editingDevice = { name: "", matter_qr_code: "", numeric_code: "", manufacturer: "", model: "", ha_device_id: "" };
+      this._editingDevice = { name: "", matter_qr_code: "", numeric_code: "", manufacturer: "", model: "", ha_device_id: "", connection_type: "" };
       this._render();
     });
 
@@ -837,6 +878,7 @@ class MatterCodePanel extends HTMLElement {
         this._editingDevice.numeric_code = ($("#field-numeric")?.value || "").trim();
         this._editingDevice.manufacturer = ($("#field-manufacturer")?.value || "").trim();
         this._editingDevice.model = ($("#field-model")?.value || "").trim();
+        this._editingDevice.connection_type = ($("#field-connection-type")?.value || "");
         this._editingDevice.ha_device_id = ($("#field-ha-device")?.value || "").trim();
       }
       this._scanning = true;
@@ -858,6 +900,14 @@ class MatterCodePanel extends HTMLElement {
             h.className = "form-hint";
             h.textContent = this._t("autoNumeric");
             numericField.parentElement.appendChild(h);
+          }
+        }
+        // Auto-suggest connection type from discoveryCaps
+        const connField = $("#field-connection-type");
+        if (connField && !connField.value) {
+          const info = _decodeMatterQR(qr);
+          if (info && info.discoveryCaps === 1) {
+            connField.value = "bluetooth";
           }
         }
       }
@@ -933,6 +983,7 @@ class MatterCodePanel extends HTMLElement {
     let numeric = ($("#field-numeric")?.value || "").trim();
     const manufacturer = ($("#field-manufacturer")?.value || "").trim();
     const model = ($("#field-model")?.value || "").trim();
+    const connectionType = ($("#field-connection-type")?.value || "");
     const haDeviceId = ($("#field-ha-device")?.value || "").trim();
     const errorEl = $("#form-error");
 
@@ -966,9 +1017,9 @@ class MatterCodePanel extends HTMLElement {
 
     try {
       if (this._editingDevice && this._editingDevice.id) {
-        await this._updateDevice(this._editingDevice.id, name, qr, numeric, manufacturer, model, haDeviceId);
+        await this._updateDevice(this._editingDevice.id, name, qr, numeric, manufacturer, model, haDeviceId, connectionType);
       } else {
-        await this._addDevice(name, qr, numeric, manufacturer, model, haDeviceId);
+        await this._addDevice(name, qr, numeric, manufacturer, model, haDeviceId, connectionType);
       }
       this._editingDevice = null;
       this._render();
@@ -1053,6 +1104,7 @@ class MatterCodePanel extends HTMLElement {
                   numeric_code: derived || "",
                   manufacturer: "",
                   model: "",
+                  connection_type: "",
                 };
               }
               this._render();
