@@ -76,7 +76,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         sidebar_title=PANEL_TITLE,
         sidebar_icon=PANEL_ICON,
         module_url=f"{PANEL_URL}/frontend/matter-code-panel.js?v={manifest_version}",
-        config={},
+        config={"version": manifest_version},
     )
 
     # Sync device registry
