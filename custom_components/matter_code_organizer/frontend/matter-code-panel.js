@@ -271,7 +271,6 @@ class MatterCodePanel extends HTMLElement {
       model: model || "",
       ha_device_id: haDeviceId || "",
     });
-    await this._loadDevices();
   }
 
   async _updateDevice(id, name, matterQrCode, numericCode, manufacturer, model, haDeviceId) {
@@ -285,7 +284,6 @@ class MatterCodePanel extends HTMLElement {
       model: model || "",
       ha_device_id: haDeviceId || "",
     });
-    await this._loadDevices();
   }
 
   async _deleteDevice(id) {
@@ -912,7 +910,7 @@ class MatterCodePanel extends HTMLElement {
         await this._addDevice(name, qr, numeric, manufacturer, model, haDeviceId);
       }
       this._editingDevice = null;
-      this._render();
+      await this._loadDevices();
     } catch (e) {
       console.error("Save error:", e);
       if (errorEl) { errorEl.textContent = e.message || "Error saving device"; errorEl.style.display = "block"; }
