@@ -867,6 +867,21 @@ class MatterCodePanel extends HTMLElement {
       if (nameField) nameField.value = haDev.name_by_user || haDev.name || "";
       if (mfrField) mfrField.value = haDev.manufacturer || "";
       if (modelField) modelField.value = haDev.model || "";
+
+      // Auto-suggest connection type from QR code if present
+      const connField = $("#field-connection-type");
+      const qrField = $("#field-qr");
+      if (connField && !connField.value && qrField) {
+        const qr = qrField.value.trim();
+        if (qr.toUpperCase().startsWith("MT:")) {
+          const info = _decodeMatterQR(qr);
+          if (info) {
+            const caps = info.discoveryCaps;
+            const suggestion = caps === 1 ? "wifi" : caps === 2 ? "bluetooth" : caps === 3 ? "wifi" : caps === 6 ? "thread" : null;
+            if (suggestion) connField.value = suggestion;
+          }
+        }
+      }
     });
 
     // Dialog scan button - scan QR into current device
@@ -906,8 +921,10 @@ class MatterCodePanel extends HTMLElement {
         const connField = $("#field-connection-type");
         if (connField && !connField.value) {
           const info = _decodeMatterQR(qr);
-          if (info && info.discoveryCaps === 1) {
-            connField.value = "bluetooth";
+          if (info) {
+            const caps = info.discoveryCaps;
+            const suggestion = caps === 1 ? "wifi" : caps === 2 ? "bluetooth" : caps === 3 ? "wifi" : caps === 6 ? "thread" : null;
+            if (suggestion) connField.value = suggestion;
           }
         }
       }
