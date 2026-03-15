@@ -71,7 +71,7 @@ function _decodeMatterQR(mtString) {
 
 // --- Connection type icons (16x16 inline SVGs) ---
 const CONNECTION_ICONS = {
-  thread: `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2.5"/><circle cx="5" cy="19" r="2.5"/><circle cx="19" cy="19" r="2.5"/><line x1="12" y1="7.5" x2="5" y2="16.5" stroke="currentColor" stroke-width="1.5" fill="none"/><line x1="12" y1="7.5" x2="19" y2="16.5" stroke="currentColor" stroke-width="1.5" fill="none"/><line x1="5" y1="19" x2="19" y2="19" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>`,
+  thread: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M9 21 C3 17 2 10 6 6 C9 3 12 3 14.5 6"/><path d="M11 10 C13 6 19 5 19 9.5 C19 13 16 12.5 14 10.5"/><path d="M14 10.5 L15.5 21"/></svg>`,
   wifi: `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.08 2.93 1 9zm8 8l3 3 3-3c-1.65-1.66-4.34-1.66-6 0zm-4-4l2 2c2.76-2.76 7.24-2.76 10 0l2-2C15.14 9.14 8.87 9.14 5 13z"/></svg>`,
   bluetooth: `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17.71 7.71L12 2h-1v7.59L6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 11 14.41V22h1l5.71-5.71-4.3-4.29 4.3-4.29zM13 5.83l1.88 1.88L13 9.59V5.83zm1.88 10.46L13 18.17v-3.76l1.88 1.88z"/></svg>`,
   ethernet: `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M7.77 6.76L6.23 5.48.82 12l5.41 6.52 1.54-1.28L3.42 12l4.35-5.24zM7 13h2v-2H7v2zm10-2h-2v2h2v-2zm-6 2h2v-2h-2v2zm6.77-7.52l-1.54 1.28L20.58 12l-4.35 5.24 1.54 1.28L23.18 12l-5.41-6.52z"/></svg>`,
