@@ -461,10 +461,12 @@ class MatterCodePanel extends HTMLElement {
           justify-content: center; color: var(--secondary-text); font-size: 13px; text-align: center;
         }
         .btn-scan-inline {
-          background: none; border: 1px solid var(--divider); border-radius: 6px;
+          background: var(--primary-background-color, #f5f5f5);
+          border: 1px solid var(--divider); border-radius: 6px;
           padding: 6px 8px; cursor: pointer; line-height: 1;
           color: var(--secondary-text); flex-shrink: 0;
           display: flex; align-items: center; justify-content: center;
+          min-width: 36px; min-height: 36px;
         }
         .btn-scan-inline:hover { background: rgba(0,0,0,0.05); }
         .device-link-badge {

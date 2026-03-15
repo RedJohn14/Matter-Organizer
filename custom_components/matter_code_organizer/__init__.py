@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 
@@ -62,6 +63,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         ]
     )
 
+    # Read version for cache-busting
+    manifest_path = os.path.join(integration_path, "manifest.json")
+    with open(manifest_path) as f:
+        manifest_version = json.load(f)["version"]
+
     # Register sidebar panel
     await panel_custom.async_register_panel(
         hass,
@@ -69,7 +75,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         frontend_url_path=PANEL_FRONTEND_PATH,
         sidebar_title=PANEL_TITLE,
         sidebar_icon=PANEL_ICON,
-        module_url=f"{PANEL_URL}/frontend/matter-code-panel.js",
+        module_url=f"{PANEL_URL}/frontend/matter-code-panel.js?v={manifest_version}",
         config={},
     )
 
