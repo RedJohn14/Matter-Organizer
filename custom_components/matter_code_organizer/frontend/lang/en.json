@@ -47,5 +47,15 @@
   "exportPdfTitle": "Matter Device Codes",
   "sortAZ": "A\u2192Z",
   "sortZA": "Z\u2192A",
-  "filterAll": "All"
+  "filterAll": "All",
+  "backupRestore": "Backup / Restore",
+  "downloadBackup": "Download Backup",
+  "restoreBackup": "Restore Backup",
+  "editor": "Editor",
+  "editorTitle": "Edit Device Data",
+  "editorSave": "Save",
+  "restoreConfirm": "This will replace all current data. Continue?",
+  "restoreSuccess": "Data restored successfully.",
+  "restoreError": "Invalid backup file.",
+  "editorInvalidJson": "Invalid JSON format."
 }

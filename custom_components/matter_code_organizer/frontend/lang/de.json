@@ -47,5 +47,15 @@
   "exportPdfTitle": "Matter Ger\u00e4tecodes",
   "sortAZ": "A\u2192Z",
   "sortZA": "Z\u2192A",
-  "filterAll": "Alle"
+  "filterAll": "Alle",
+  "backupRestore": "Sichern / Wiederherstellen",
+  "downloadBackup": "Backup herunterladen",
+  "restoreBackup": "Backup wiederherstellen",
+  "editor": "Editor",
+  "editorTitle": "Ger\u00e4tedaten bearbeiten",
+  "editorSave": "Speichern",
+  "restoreConfirm": "Alle aktuellen Daten werden ersetzt. Fortfahren?",
+  "restoreSuccess": "Daten erfolgreich wiederhergestellt.",
+  "restoreError": "Ung\u00fcltige Backup-Datei.",
+  "editorInvalidJson": "Ung\u00fcltiges JSON-Format."
 }

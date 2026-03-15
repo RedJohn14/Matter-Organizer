@@ -111,3 +111,12 @@ class MatterCodeStore:
                 await self.async_save()
                 return True
         return False
+
+    async def async_get_raw_data(self) -> dict:
+        """Return raw storage data for backup/editor."""
+        return {"devices": self._devices}
+
+    async def async_restore_data(self, data: dict) -> None:
+        """Replace all data from a backup/editor."""
+        self._devices = data.get("devices", [])
+        await self.async_save()

@@ -53,6 +53,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     websocket_api.async_register_command(hass, ws_update_device)
     websocket_api.async_register_command(hass, ws_delete_device)
     websocket_api.async_register_command(hass, ws_import_devices)
+    websocket_api.async_register_command(hass, ws_backup)
+    websocket_api.async_register_command(hass, ws_restore)
 
     # Register static paths for frontend files
     integration_path = os.path.dirname(__file__)
@@ -269,3 +271,30 @@ async def ws_import_devices(hass, connection, msg):
     entry = hass.data[DOMAIN]["entry"]
     await _sync_device_registry(hass, entry, store)
     connection.send_result(msg["id"], {"devices": imported})
+
+
+@websocket_api.websocket_command(
+    {vol.Required("type"): "matter_code_organizer/backup"}
+)
+@websocket_api.async_response
+async def ws_backup(hass, connection, msg):
+    """Return full JSON data for backup/editor."""
+    store = hass.data[DOMAIN]["store"]
+    data = await store.async_get_raw_data()
+    connection.send_result(msg["id"], data)
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "matter_code_organizer/restore",
+        vol.Required("data"): dict,
+    }
+)
+@websocket_api.async_response
+async def ws_restore(hass, connection, msg):
+    """Restore data from a backup or editor."""
+    store = hass.data[DOMAIN]["store"]
+    await store.async_restore_data(msg["data"])
+    entry = hass.data[DOMAIN]["entry"]
+    await _sync_device_registry(hass, entry, store)
+    connection.send_result(msg["id"], {})

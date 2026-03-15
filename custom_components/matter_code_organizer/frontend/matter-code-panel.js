@@ -164,6 +164,9 @@ class MatterCodePanel extends HTMLElement {
     this._importSelection = new Set();
     this._sortAZ = true;
     this._filterConnection = "";
+    this._showEditorDialog = false;
+    this._editorData = "";
+    this._showBackupMenu = false;
   }
 
   set hass(hass) {
@@ -337,6 +340,27 @@ class MatterCodePanel extends HTMLElement {
           display: flex; align-items: center; gap: 6px;
         }
         .toolbar-actions button:hover { background: rgba(255,255,255,0.3); }
+        .toolbar-actions button:disabled { opacity: 0.5; cursor: default; }
+        .toolbar-dropdown { position: relative; display: inline-block; }
+        .toolbar-dropdown-menu {
+          position: absolute; right: 0; top: calc(100% + 4px);
+          background: var(--card-background-color, #fff); border-radius: 8px;
+          box-shadow: 0 4px 16px rgba(0,0,0,0.18); z-index: 20;
+          overflow: hidden; min-width: 200px;
+        }
+        .toolbar-dropdown-menu button {
+          display: flex; width: 100%; padding: 12px 16px; border: none;
+          background: none; text-align: left; cursor: pointer;
+          font-size: 14px; color: var(--text-color, #333); align-items: center; gap: 8px;
+        }
+        .toolbar-dropdown-menu button:hover { background: rgba(0,0,0,0.06); }
+        .editor-textarea {
+          width: 100%; min-height: 400px; font-family: "Roboto Mono", monospace;
+          font-size: 13px; border: 1px solid var(--divider); border-radius: 8px;
+          padding: 12px; box-sizing: border-box; resize: vertical;
+          background: var(--card-background-color, #fff); color: var(--text-color);
+        }
+        .editor-textarea:focus { border-color: var(--primary-color); outline: none; }
         .content { max-width: 900px; margin: 0 auto; padding: 16px; }
         .search-bar { margin-bottom: 16px; }
         .search-bar input {
@@ -533,6 +557,29 @@ class MatterCodePanel extends HTMLElement {
             <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-8.5 7.5c0 .83-.67 1.5-1.5 1.5H9v2H7.5V7H10c.83 0 1.5.67 1.5 1.5v1zm5 2c0 .83-.67 1.5-1.5 1.5h-2.5V7H15c.83 0 1.5.67 1.5 1.5v3zm4-3H19v1h1.5V11H19v2h-1.5V7h3v1.5zM9 9.5h1v-1H9v1zM4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm10 5.5h1v-3h-1v3z"/></svg>
             <span class="btn-text">${this._t("exportPdf")}</span>
           </button>
+          <div class="toolbar-dropdown">
+            <button id="btn-backup-restore">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3C7.58 3 4 6.58 4 11H1l3.89 3.89.07.14L9 11H6c0-3.31 2.69-6 6-6s6 2.69 6 6-2.69 6-6 6c-1.66 0-3.14-.69-4.22-1.78L6.34 16.66C7.9 18.24 9.83 19 12 19c4.42 0 8-3.58 8-8s-3.58-8-8-8zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H11z"/></svg>
+              <span class="btn-text">${this._t("backupRestore")}</span>
+            </button>
+            ${this._showBackupMenu ? `
+              <div class="toolbar-dropdown-menu" id="backup-dropdown-menu">
+                <button id="btn-download-backup">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+                  ${this._t("downloadBackup")}
+                </button>
+                <button id="btn-restore-backup">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/></svg>
+                  ${this._t("restoreBackup")}
+                </button>
+                <button id="btn-editor">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+                  ${this._t("editor")}
+                </button>
+              </div>
+            ` : ""}
+          </div>
+          <input type="file" id="restore-file-input" accept=".json" style="display:none;">
           <button id="btn-import">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
             <span class="btn-text">${this._t("importDevices")}</span>
@@ -639,6 +686,10 @@ class MatterCodePanel extends HTMLElement {
 
     if (this._showImportDialog) {
       return this._renderImportDialog();
+    }
+
+    if (this._showEditorDialog) {
+      return this._renderEditorDialog();
     }
 
     if (!this._editingDevice) return "";
@@ -761,6 +812,22 @@ class MatterCodePanel extends HTMLElement {
     `;
   }
 
+  _renderEditorDialog() {
+    return `
+      <div class="overlay" id="overlay">
+        <div class="dialog">
+          <h2>${this._t("editorTitle")}</h2>
+          <textarea class="editor-textarea" id="editor-textarea">${this._escHtml(this._editorData)}</textarea>
+          <div class="form-error" id="editor-error" style="display:none;"></div>
+          <div class="dialog-actions">
+            <button class="btn-cancel" id="btn-editor-cancel">${this._t("cancel")}</button>
+            <button class="btn-save" id="btn-editor-save">${this._t("editorSave")}</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
   _bindEvents() {
     const $ = (sel) => this.shadowRoot.querySelector(sel);
     const $$ = (sel) => this.shadowRoot.querySelectorAll(sel);
@@ -775,6 +842,44 @@ class MatterCodePanel extends HTMLElement {
     });
 
     $("#btn-export-pdf")?.addEventListener("click", () => this._exportPdf());
+
+    // Backup / Restore dropdown
+    $("#btn-backup-restore")?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this._showBackupMenu = !this._showBackupMenu;
+      this._render();
+    });
+
+    $("#btn-download-backup")?.addEventListener("click", () => {
+      this._showBackupMenu = false;
+      this._downloadBackup();
+    });
+
+    $("#btn-restore-backup")?.addEventListener("click", () => {
+      this._showBackupMenu = false;
+      this._render();
+      this.shadowRoot.querySelector("#restore-file-input")?.click();
+    });
+
+    $("#restore-file-input")?.addEventListener("change", (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      this._restoreFromFile(file);
+      e.target.value = "";
+    });
+
+    $("#btn-editor")?.addEventListener("click", () => {
+      this._showBackupMenu = false;
+      this._openEditor();
+    });
+
+    // Editor dialog events
+    $("#btn-editor-cancel")?.addEventListener("click", () => {
+      this._showEditorDialog = false;
+      this._render();
+    });
+
+    $("#btn-editor-save")?.addEventListener("click", () => this._handleEditorSave());
 
     $("#btn-import")?.addEventListener("click", () => {
       this._showImportDialog = true;
@@ -847,6 +952,12 @@ class MatterCodePanel extends HTMLElement {
     this.shadowRoot.addEventListener("click", (e) => {
       if (!e.target.closest(".menu-btn") && !e.target.closest(".dropdown")) {
         $$(".dropdown").forEach((d) => d.remove());
+      }
+      if (!e.target.closest(".toolbar-dropdown")) {
+        if (this._showBackupMenu) {
+          this._showBackupMenu = false;
+          this._render();
+        }
       }
     });
 
@@ -984,6 +1095,7 @@ class MatterCodePanel extends HTMLElement {
           this._editingDevice = null;
           this._scanning = false;
           this._showImportDialog = false;
+          this._showEditorDialog = false;
         }
         this._render();
       }
@@ -1075,6 +1187,101 @@ class MatterCodePanel extends HTMLElement {
       await this._loadDevices();
     } catch (e) {
       console.error("Import error:", e);
+    }
+  }
+
+  async _downloadBackup() {
+    try {
+      const result = await this._hass.callWS({
+        type: "matter_code_organizer/backup",
+      });
+      const json = JSON.stringify(result, null, 2);
+      const blob = new Blob([json], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const date = new Date().toISOString().slice(0, 10);
+      a.href = url;
+      a.download = `matter-codes-backup-${date}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error("Backup error:", e);
+    }
+  }
+
+  async _restoreFromFile(file) {
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      if (!data.devices || !Array.isArray(data.devices)) {
+        alert(this._t("restoreError"));
+        return;
+      }
+      if (!confirm(this._t("restoreConfirm"))) return;
+      await this._hass.callWS({
+        type: "matter_code_organizer/restore",
+        data: data,
+      });
+      await this._loadDevices();
+      alert(this._t("restoreSuccess"));
+    } catch (e) {
+      console.error("Restore error:", e);
+      alert(this._t("restoreError"));
+    }
+  }
+
+  async _openEditor() {
+    try {
+      const result = await this._hass.callWS({
+        type: "matter_code_organizer/backup",
+      });
+      this._editorData = JSON.stringify(result, null, 2);
+      this._showEditorDialog = true;
+      this._render();
+    } catch (e) {
+      console.error("Editor load error:", e);
+    }
+  }
+
+  async _handleEditorSave() {
+    const textarea = this.shadowRoot.querySelector("#editor-textarea");
+    const errorEl = this.shadowRoot.querySelector("#editor-error");
+    if (!textarea) return;
+
+    let data;
+    try {
+      data = JSON.parse(textarea.value);
+    } catch (e) {
+      if (errorEl) {
+        errorEl.textContent = this._t("editorInvalidJson");
+        errorEl.style.display = "block";
+      }
+      return;
+    }
+
+    if (!data.devices || !Array.isArray(data.devices)) {
+      if (errorEl) {
+        errorEl.textContent = this._t("editorInvalidJson");
+        errorEl.style.display = "block";
+      }
+      return;
+    }
+
+    if (!confirm(this._t("restoreConfirm"))) return;
+
+    try {
+      await this._hass.callWS({
+        type: "matter_code_organizer/restore",
+        data: data,
+      });
+      this._showEditorDialog = false;
+      await this._loadDevices();
+    } catch (e) {
+      console.error("Editor save error:", e);
+      if (errorEl) {
+        errorEl.textContent = e.message || "Error saving data";
+        errorEl.style.display = "block";
+      }
     }
   }
 
