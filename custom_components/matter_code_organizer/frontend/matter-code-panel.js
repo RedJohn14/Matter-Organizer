@@ -383,6 +383,10 @@ class MatterCodePanel extends HTMLElement {
           font-size: 20px; font-weight: 400; box-sizing: border-box;
         }
         .toolbar-title { flex: 1; }
+        .toolbar-logo {
+          display: none; width: 28px; height: 28px; flex-shrink: 0;
+        }
+        .toolbar-title-text { }
         .hamburger-btn {
           display: none; background: none; border: none; color: inherit;
           cursor: pointer; padding: 8px; margin-right: 8px; border-radius: 50%;
@@ -542,6 +546,8 @@ class MatterCodePanel extends HTMLElement {
           .hamburger-btn { display: flex; align-items: center; }
           .toolbar { padding: 12px; font-size: 18px; }
           .toolbar-actions button span.btn-text { display: none; }
+          .toolbar-logo { display: inline-flex; }
+          .toolbar-title-text { display: none; }
           .version-badge { display: block; font-size: 10px; line-height: 1; margin-top: 2px; }
         }
       </style>
@@ -553,7 +559,19 @@ class MatterCodePanel extends HTMLElement {
           </svg>
         </button>
         <div class="toolbar-title">
-          ${this._t("title")}
+          <svg class="toolbar-logo" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="14" cy="6" r="3" fill="currentColor"/>
+            <circle cx="6" cy="20" r="3" fill="currentColor"/>
+            <circle cx="22" cy="20" r="3" fill="currentColor"/>
+            <circle cx="14" cy="16" r="2.5" fill="currentColor" opacity="0.7"/>
+            <line x1="14" y1="9" x2="14" y2="13.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            <line x1="11.8" y1="17.2" x2="8" y2="18.8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            <line x1="16.2" y1="17.2" x2="20" y2="18.8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            <line x1="14" y1="6" x2="6" y2="20" stroke="currentColor" stroke-width="1" opacity="0.3"/>
+            <line x1="14" y1="6" x2="22" y2="20" stroke="currentColor" stroke-width="1" opacity="0.3"/>
+            <line x1="6" y1="20" x2="22" y2="20" stroke="currentColor" stroke-width="1" opacity="0.3"/>
+          </svg>
+          <span class="toolbar-title-text">${this._t("title")}</span>
           <span class="version-badge">v${this._escHtml(this._version)}</span>
         </div>
         <div class="toolbar-actions">
