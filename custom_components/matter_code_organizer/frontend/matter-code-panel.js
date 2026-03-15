@@ -460,6 +460,12 @@ class MatterCodePanel extends HTMLElement {
           width: 120px; height: 120px; display: flex; align-items: center;
           justify-content: center; color: var(--secondary-text); font-size: 13px; text-align: center;
         }
+        .btn-scan-inline {
+          background: none; border: 1px solid var(--divider); border-radius: 6px;
+          padding: 8px 10px; cursor: pointer; font-size: 18px; line-height: 1;
+          color: var(--secondary-text); flex-shrink: 0;
+        }
+        .btn-scan-inline:hover { background: rgba(0,0,0,0.05); }
         .device-link-badge {
           display: inline-flex; align-items: center; gap: 4px;
           font-size: 12px; color: var(--primary-color); cursor: pointer;
@@ -633,7 +639,10 @@ class MatterCodePanel extends HTMLElement {
           </div>
           <div class="form-field">
             <label>${this._t("matterQr")}</label>
-            <input type="text" id="field-qr" value="${this._escHtml(qrVal)}" placeholder="MT:..." />
+            <div style="display:flex;gap:8px;">
+              <input type="text" id="field-qr" value="${this._escHtml(qrVal)}" placeholder="MT:..." style="flex:1;" />
+              <button type="button" class="btn-scan-inline" id="btn-dialog-scan" title="${this._t("scanTitle")}">📷</button>
+            </div>
           </div>
           <div class="form-field">
             <label>${this._t("numericCode")}</label>
@@ -790,6 +799,22 @@ class MatterCodePanel extends HTMLElement {
       if (modelField) modelField.value = haDev.model || "";
     });
 
+    // Dialog scan button - scan QR into current device
+    $("#btn-dialog-scan")?.addEventListener("click", () => {
+      // Preserve current form values before switching to scanner
+      if (this._editingDevice) {
+        this._editingDevice.name = ($("#field-name")?.value || "").trim();
+        this._editingDevice.matter_qr_code = ($("#field-qr")?.value || "").trim();
+        this._editingDevice.numeric_code = ($("#field-numeric")?.value || "").trim();
+        this._editingDevice.manufacturer = ($("#field-manufacturer")?.value || "").trim();
+        this._editingDevice.model = ($("#field-model")?.value || "").trim();
+        this._editingDevice.ha_device_id = ($("#field-ha-device")?.value || "").trim();
+      }
+      this._scanning = true;
+      this._render();
+      this._startScanner();
+    });
+
     // QR field - auto-compute numeric on input
     $("#field-qr")?.addEventListener("input", (e) => {
       const qr = e.target.value.trim();
@@ -850,10 +875,16 @@ class MatterCodePanel extends HTMLElement {
 
     $("#overlay")?.addEventListener("click", (e) => {
       if (e.target.id === "overlay") {
-        this._stopScanner();
-        this._editingDevice = null;
-        this._scanning = false;
-        this._showImportDialog = false;
+        if (this._scanning && this._editingDevice) {
+          // Scanning from dialog: stop scanner and return to dialog
+          this._stopScanner();
+          this._scanning = false;
+        } else {
+          this._stopScanner();
+          this._editingDevice = null;
+          this._scanning = false;
+          this._showImportDialog = false;
+        }
         this._render();
       }
     });
@@ -861,6 +892,7 @@ class MatterCodePanel extends HTMLElement {
     $("#btn-scan-stop")?.addEventListener("click", () => {
       this._stopScanner();
       this._scanning = false;
+      // If _editingDevice is set, return to dialog; otherwise back to main
       this._render();
     });
   }
@@ -979,13 +1011,20 @@ class MatterCodePanel extends HTMLElement {
               this._stopScanner();
               this._scanning = false;
               const derived = deriveNumericCode(code.data);
-              this._editingDevice = {
-                name: "",
-                matter_qr_code: code.data,
-                numeric_code: derived || "",
-                manufacturer: "",
-                model: "",
-              };
+              if (this._editingDevice) {
+                // Dialog scan: fill QR into existing device
+                this._editingDevice.matter_qr_code = code.data;
+                this._editingDevice.numeric_code = derived || this._editingDevice.numeric_code || "";
+              } else {
+                // Main page scan: create new device
+                this._editingDevice = {
+                  name: "",
+                  matter_qr_code: code.data,
+                  numeric_code: derived || "",
+                  manufacturer: "",
+                  model: "",
+                };
+              }
               this._render();
               return;
             }
