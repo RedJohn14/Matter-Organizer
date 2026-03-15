@@ -355,6 +355,11 @@ class MatterCodePanel extends HTMLElement {
           font-size: 20px; font-weight: 400; box-sizing: border-box;
         }
         .toolbar-title { flex: 1; }
+        .menu-btn {
+          display: none; background: none; border: none; color: inherit;
+          cursor: pointer; padding: 8px; margin-right: 8px; border-radius: 50%;
+        }
+        .menu-btn:hover { background: rgba(255,255,255,0.2); }
         .toolbar-actions { display: flex; gap: 8px; }
         .toolbar-actions button {
           background: rgba(255,255,255,0.2); border: none; color: inherit;
@@ -500,13 +505,19 @@ class MatterCodePanel extends HTMLElement {
         @media (max-width: 600px) {
           .device-card { flex-direction: column; align-items: center; text-align: center; }
           .device-info { width: 100%; }
-          .toolbar { padding: 12px 12px 12px 56px; font-size: 18px; }
+          .menu-btn { display: flex; align-items: center; }
+          .toolbar { padding: 12px; font-size: 18px; }
           .toolbar-actions button span.btn-text { display: none; }
           .version-badge { display: block; font-size: 10px; line-height: 1; margin-top: 2px; }
         }
       </style>
 
       <div class="toolbar">
+        <button class="menu-btn" id="btn-menu" aria-label="Menu">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/>
+          </svg>
+        </button>
         <div class="toolbar-title">
           ${this._t("title")}
           <span class="version-badge">v${this._escHtml(this._version)}</span>
@@ -720,6 +731,10 @@ class MatterCodePanel extends HTMLElement {
   _bindEvents() {
     const $ = (sel) => this.shadowRoot.querySelector(sel);
     const $$ = (sel) => this.shadowRoot.querySelectorAll(sel);
+
+    $("#btn-menu")?.addEventListener("click", () => {
+      this.dispatchEvent(new Event("hass-toggle-menu", { bubbles: true, composed: true }));
+    });
 
     $("#btn-add")?.addEventListener("click", () => {
       this._editingDevice = { name: "", matter_qr_code: "", numeric_code: "", manufacturer: "", model: "", ha_device_id: "" };
