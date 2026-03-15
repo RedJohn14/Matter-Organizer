@@ -500,7 +500,7 @@ class MatterCodePanel extends HTMLElement {
         @media (max-width: 600px) {
           .device-card { flex-direction: column; align-items: center; text-align: center; }
           .device-info { width: 100%; }
-          .toolbar { padding: 12px; font-size: 18px; }
+          .toolbar { padding: 12px 12px 12px 56px; font-size: 18px; }
           .toolbar-actions button span.btn-text { display: none; }
           .version-badge { display: block; font-size: 10px; line-height: 1; margin-top: 2px; }
         }
