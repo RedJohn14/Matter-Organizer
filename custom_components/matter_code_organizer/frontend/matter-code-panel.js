@@ -494,21 +494,23 @@ class MatterCodePanel extends HTMLElement {
         }
         .import-toolbar button:hover { text-decoration: underline; }
         .version-badge {
-          font-size: 11px; opacity: 0.6; align-self: center;
-          margin-right: 8px; font-weight: 400;
+          font-size: 11px; opacity: 0.6;
+          font-weight: 400;
         }
         @media (max-width: 600px) {
           .device-card { flex-direction: column; align-items: center; text-align: center; }
           .device-info { width: 100%; }
           .toolbar { padding: 12px; font-size: 18px; }
           .toolbar-actions button span.btn-text { display: none; }
-          .version-badge { display: none; }
+          .version-badge { display: block; font-size: 10px; line-height: 1; margin-top: 2px; }
         }
       </style>
 
       <div class="toolbar">
-        <div class="toolbar-title">${this._t("title")}</div>
-        <span class="version-badge">v${this._escHtml(this._version)}</span>
+        <div class="toolbar-title">
+          ${this._t("title")}
+          <span class="version-badge">v${this._escHtml(this._version)}</span>
+        </div>
         <div class="toolbar-actions">
           <button id="btn-import">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
