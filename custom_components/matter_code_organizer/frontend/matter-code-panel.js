@@ -462,8 +462,9 @@ class MatterCodePanel extends HTMLElement {
         }
         .btn-scan-inline {
           background: none; border: 1px solid var(--divider); border-radius: 6px;
-          padding: 8px 10px; cursor: pointer; font-size: 18px; line-height: 1;
+          padding: 6px 8px; cursor: pointer; line-height: 1;
           color: var(--secondary-text); flex-shrink: 0;
+          display: flex; align-items: center; justify-content: center;
         }
         .btn-scan-inline:hover { background: rgba(0,0,0,0.05); }
         .device-link-badge {
@@ -641,7 +642,9 @@ class MatterCodePanel extends HTMLElement {
             <label>${this._t("matterQr")}</label>
             <div style="display:flex;gap:8px;">
               <input type="text" id="field-qr" value="${this._escHtml(qrVal)}" placeholder="MT:..." style="flex:1;" />
-              <button type="button" class="btn-scan-inline" id="btn-dialog-scan" title="${this._t("scanTitle")}">📷</button>
+              <button type="button" class="btn-scan-inline" id="btn-dialog-scan" title="${this._t("scanTitle")}">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M9.5 6.5v3h-3v-3h3M11 5H5v6h6V5zm-1.5 9.5v3h-3v-3h3M11 13H5v6h6v-6zm6.5-6.5v3h-3v-3h3M19 5h-6v6h6V5zm-6 8h1.5v1.5H13V13zm1.5 1.5H16V16h-1.5v-1.5zM16 13h1.5v1.5H16V13zm-3 3h1.5v1.5H13V16zm1.5 1.5H16V19h-1.5v-1.5zM16 16h1.5v1.5H16V16zm1.5-1.5H19V16h-1.5v-1.5zm0 3H19V19h-1.5v-1.5z"/></svg>
+              </button>
             </div>
           </div>
           <div class="form-field">
@@ -911,7 +914,7 @@ class MatterCodePanel extends HTMLElement {
       if (errorEl) { errorEl.textContent = this._t("nameRequired"); errorEl.style.display = "block"; }
       return;
     }
-    if (!qr && !numeric) {
+    if (!qr && !numeric && !(this._editingDevice && this._editingDevice.id)) {
       if (errorEl) { errorEl.textContent = this._t("codeRequired"); errorEl.style.display = "block"; }
       return;
     }
@@ -942,6 +945,7 @@ class MatterCodePanel extends HTMLElement {
         await this._addDevice(name, qr, numeric, manufacturer, model, haDeviceId);
       }
       this._editingDevice = null;
+      this._render();
       await this._loadDevices();
     } catch (e) {
       console.error("Save error:", e);
