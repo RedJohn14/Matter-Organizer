@@ -71,7 +71,7 @@ function _decodeMatterQR(mtString) {
 
 // --- Connection type icons (16x16 inline SVGs) ---
 const CONNECTION_ICONS = {
-  thread: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M9 21 C3 17 2 10 6 6 C9 3 12 3 14.5 6"/><path d="M11 10 C13 6 19 5 19 9.5 C19 13 16 12.5 14 10.5"/><path d="M14 10.5 L15.5 21"/></svg>`,
+  thread: `<svg width="16" height="16" viewBox="0 0 24 24"><circle cx="12" cy="12" r="12" fill="#5B2B82"/><path d="M7.5 8.5 C7.5 6.5 9.5 5 12 5 C14.5 5 16.5 6.5 16.5 8.5 C16.5 10.5 14.5 12 12 12 C9.5 12 7.5 13.5 7.5 15.5 C7.5 17.5 9.5 19 12 19 C14.5 19 16.5 17.5 16.5 15.5" fill="none" stroke="white" stroke-width="2" stroke-linecap="round"/><line x1="12" y1="5" x2="12" y2="3.5" stroke="white" stroke-width="2" stroke-linecap="round"/><line x1="12" y1="20.5" x2="12" y2="19" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>`,
   wifi: `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.08 2.93 1 9zm8 8l3 3 3-3c-1.65-1.66-4.34-1.66-6 0zm-4-4l2 2c2.76-2.76 7.24-2.76 10 0l2-2C15.14 9.14 8.87 9.14 5 13z"/></svg>`,
   bluetooth: `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17.71 7.71L12 2h-1v7.59L6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 11 14.41V22h1l5.71-5.71-4.3-4.29 4.3-4.29zM13 5.83l1.88 1.88L13 9.59V5.83zm1.88 10.46L13 18.17v-3.76l1.88 1.88z"/></svg>`,
   ethernet: `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M7.77 6.76L6.23 5.48.82 12l5.41 6.52 1.54-1.28L3.42 12l4.35-5.24zM7 13h2v-2H7v2zm10-2h-2v2h2v-2zm-6 2h2v-2h-2v2zm6.77-7.52l-1.54 1.28L20.58 12l-4.35 5.24 1.54 1.28L23.18 12l-5.41-6.52z"/></svg>`,
@@ -126,110 +126,27 @@ function formatNumericCode(code) {
 }
 
 // --- Translations ---
-const TRANSLATIONS = {
-  en: {
-    title: "Matter Code Organizer",
-    add: "Add Device",
-    scan: "Scan QR Code",
-    search: "Search devices\u2026",
-    name: "Device Name",
-    matterQr: "Matter QR Code (MT:\u2026)",
-    numericCode: "Numeric Setup Code",
-    manufacturer: "Manufacturer",
-    model: "Model",
-    save: "Save",
-    cancel: "Cancel",
-    edit: "Edit",
-    delete: "Delete",
-    copyCode: "Copy numeric code",
-    copied: "Copied!",
-    noDevices: "No devices yet. Add your first Matter device code.",
-    noResults: "No devices match your search.",
-    confirmDelete: "Delete this device?",
-    scanTitle: "Scan Matter QR Code",
-    scanHint: "Point your camera at a Matter QR code",
-    scanStop: "Stop Scanning",
-    cameraError: "Could not access camera. Make sure HTTPS is enabled and camera permission is granted.",
-    nameRequired: "Device name is required.",
-    codeRequired: "Please enter a QR code or numeric code.",
-    duplicateCode: "This Matter code is already saved.",
-    editDevice: "Edit Device",
-    addDevice: "Add Device",
-    linkDevice: "Link to Home Assistant device",
-    linkNone: "-- No link --",
-    autoNumeric: "Auto-computed from QR code",
-    importDevices: "Import Devices",
-    importTitle: "Import Matter Devices",
-    importHint: "Select HA Matter devices to import into the organizer.",
-    importSelectAll: "Select All",
-    importDeselectAll: "Deselect All",
-    importSelected: "Import Selected",
-    importAllDone: "All Matter devices are already imported.",
-    linkedDevice: "Linked HA device",
-    connectionType: "Connection Type",
-    connectionNone: "-- None --",
-    connectionThread: "Thread",
-    connectionWifi: "Wi-Fi",
-    connectionBluetooth: "Bluetooth",
-    connectionEthernet: "Ethernet",
-    exportPdf: "Export PDF",
-    exportPdfTitle: "Matter Device Codes",
-    sortAZ: "A→Z",
-    sortZA: "Z→A",
-    filterAll: "All",
-  },
-  de: {
-    title: "Matter Code Organizer",
-    add: "Gerät hinzufügen",
-    scan: "QR-Code scannen",
-    search: "Geräte suchen\u2026",
-    name: "Gerätename",
-    matterQr: "Matter QR-Code (MT:\u2026)",
-    numericCode: "Numerischer Setup-Code",
-    manufacturer: "Hersteller",
-    model: "Modell",
-    save: "Speichern",
-    cancel: "Abbrechen",
-    edit: "Bearbeiten",
-    delete: "Löschen",
-    copyCode: "Numerischen Code kopieren",
-    copied: "Kopiert!",
-    noDevices: "Noch keine Geräte. Fügen Sie Ihren ersten Matter-Gerätecode hinzu.",
-    noResults: "Keine Geräte entsprechen Ihrer Suche.",
-    confirmDelete: "Dieses Gerät löschen?",
-    scanTitle: "Matter QR-Code scannen",
-    scanHint: "Richten Sie Ihre Kamera auf einen Matter QR-Code",
-    scanStop: "Scan beenden",
-    cameraError: "Kamerazugriff nicht möglich. Stellen Sie sicher, dass HTTPS aktiviert ist und die Kameraberechtigung erteilt wurde.",
-    nameRequired: "Gerätename ist erforderlich.",
-    codeRequired: "Bitte geben Sie einen QR-Code oder numerischen Code ein.",
-    duplicateCode: "Dieser Matter-Code ist bereits gespeichert.",
-    editDevice: "Gerät bearbeiten",
-    addDevice: "Gerät hinzufügen",
-    linkDevice: "Mit Home Assistant Gerät verknüpfen",
-    linkNone: "-- Keine Verknüpfung --",
-    autoNumeric: "Automatisch aus QR-Code berechnet",
-    importDevices: "Geräte importieren",
-    importTitle: "Matter-Geräte importieren",
-    importHint: "Wählen Sie HA Matter-Geräte zum Import in den Organizer.",
-    importSelectAll: "Alle auswählen",
-    importDeselectAll: "Alle abwählen",
-    importSelected: "Ausgewählte importieren",
-    importAllDone: "Alle Matter-Geräte sind bereits importiert.",
-    linkedDevice: "Verknüpftes HA-Gerät",
-    connectionType: "Verbindungstyp",
-    connectionNone: "-- Keine --",
-    connectionThread: "Thread",
-    connectionWifi: "WLAN",
-    connectionBluetooth: "Bluetooth",
-    connectionEthernet: "Ethernet",
-    exportPdf: "PDF exportieren",
-    exportPdfTitle: "Matter Gerätecodes",
-    sortAZ: "A→Z",
-    sortZA: "Z→A",
-    filterAll: "Alle",
-  },
-};
+let TRANSLATIONS = {};
+
+async function _loadTranslations(lang) {
+  const supported = ["en", "de"];
+  const code = supported.includes(lang) ? lang : "en";
+  if (TRANSLATIONS[code]) return;
+  try {
+    const resp = await fetch(`${BASE_PATH}/lang/${code}.json`);
+    TRANSLATIONS[code] = await resp.json();
+  } catch (e) {
+    console.error("Failed to load translations:", e);
+  }
+  if (code !== "en" && !TRANSLATIONS.en) {
+    try {
+      const resp = await fetch(`${BASE_PATH}/lang/en.json`);
+      TRANSLATIONS.en = await resp.json();
+    } catch (e) {
+      console.error("Failed to load English fallback translations:", e);
+    }
+  }
+}
 
 class MatterCodePanel extends HTMLElement {
   constructor() {
@@ -254,9 +171,11 @@ class MatterCodePanel extends HTMLElement {
     if (!this._initialized) {
       this._initialized = true;
       this._lang = (hass.language || "en").substring(0, 2);
-      if (!TRANSLATIONS[this._lang]) this._lang = "en";
-      this._loadDevices();
-      this._loadMatterHADevices();
+      if (!["en", "de"].includes(this._lang)) this._lang = "en";
+      _loadTranslations(this._lang).then(() => {
+        this._loadDevices();
+        this._loadMatterHADevices();
+      });
     }
   }
 
