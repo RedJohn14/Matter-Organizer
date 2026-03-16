@@ -684,6 +684,7 @@ class MatterCodePanel extends HTMLElement {
   _renderDialog() {
     if (this._zoomedQR) {
       return `
+        <style>.device-qr { visibility: hidden; }</style>
         <div class="overlay" id="qr-zoom-overlay">
           <div class="qr-zoom-dialog">
             <div class="qr-zoom-container" id="qr-zoom-container"></div>
