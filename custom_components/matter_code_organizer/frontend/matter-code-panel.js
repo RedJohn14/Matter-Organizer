@@ -167,6 +167,7 @@ class MatterCodePanel extends HTMLElement {
     this._showEditorDialog = false;
     this._editorData = "";
     this._showBackupMenu = false;
+    this._zoomedQR = null;
   }
 
   set hass(hass) {
@@ -281,7 +282,7 @@ class MatterCodePanel extends HTMLElement {
     if (!data || !window.qrcode) return;
     try {
       const qr = window.qrcode(0, "M");
-      qr.addData(data);
+      qr.addData(data, 'Alphanumeric');
       qr.make();
       container.innerHTML = qr.createSvgTag(4, 0);
     } catch (e) {
@@ -395,8 +396,20 @@ class MatterCodePanel extends HTMLElement {
           flex-shrink: 0; width: 120px; height: 120px;
           display: flex; align-items: center; justify-content: center;
           background: #fff; border-radius: 8px; border: 1px solid var(--divider);
+          cursor: pointer;
         }
         .device-qr svg { width: 112px; height: 112px; }
+        .qr-zoom-dialog {
+          background: #fff; border-radius: 12px; padding: 24px;
+          width: 340px; box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+          display: flex; flex-direction: column; align-items: center;
+        }
+        .qr-zoom-container { width: 300px; height: 300px; display: flex; align-items: center; justify-content: center; }
+        .qr-zoom-container svg { width: 300px; height: 300px; }
+        .qr-zoom-text {
+          margin-top: 12px; font-family: "Roboto Mono", monospace; font-size: 13px;
+          color: #333; word-break: break-all; text-align: center; user-select: all;
+        }
         .device-info { flex: 1; min-width: 0; }
         .device-name-row { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
         .device-name { font-size: 18px; font-weight: 500; }
@@ -659,12 +672,25 @@ class MatterCodePanel extends HTMLElement {
       this.shadowRoot.querySelectorAll(".device-qr[data-qr]").forEach((el) => {
         this._generateQRCode(el.dataset.qr, el);
       });
+      if (this._zoomedQR) {
+        const zoomContainer = this.shadowRoot.querySelector("#qr-zoom-container");
+        if (zoomContainer) this._generateQRCode(this._zoomedQR, zoomContainer);
+      }
     });
 
     this._bindEvents();
   }
 
   _renderDialog() {
+    if (this._zoomedQR) {
+      return `
+        <div class="overlay" id="qr-zoom-overlay">
+          <div class="qr-zoom-dialog">
+            <div class="qr-zoom-container" id="qr-zoom-container"></div>
+            <div class="qr-zoom-text">${this._escHtml(this._zoomedQR)}</div>
+          </div>
+        </div>`;
+    }
     if (this._scanning) {
       return `
         <div class="overlay" id="overlay">
@@ -834,6 +860,20 @@ class MatterCodePanel extends HTMLElement {
 
     $("#btn-menu")?.addEventListener("click", () => {
       this.dispatchEvent(new Event("hass-toggle-menu", { bubbles: true, composed: true }));
+    });
+
+    // QR zoom handlers
+    $$(".device-qr[data-qr]").forEach((el) => {
+      el.addEventListener("click", () => {
+        this._zoomedQR = el.dataset.qr;
+        this._render();
+      });
+    });
+    $("#qr-zoom-overlay")?.addEventListener("click", (e) => {
+      if (e.target.id === "qr-zoom-overlay") {
+        this._zoomedQR = null;
+        this._render();
+      }
     });
 
     $("#btn-add")?.addEventListener("click", () => {
@@ -1410,7 +1450,7 @@ class MatterCodePanel extends HTMLElement {
       if (d.matter_qr_code && window.qrcode) {
         try {
           const qr = window.qrcode(0, "M");
-          qr.addData(d.matter_qr_code);
+          qr.addData(d.matter_qr_code, 'Alphanumeric');
           qr.make();
           const svgStr = qr.createSvgTag(4, 0);
           // Convert SVG to data URL for PDF embedding
