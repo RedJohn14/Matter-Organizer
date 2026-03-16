@@ -27,6 +27,16 @@ class MatterCodeStore:
         else:
             self._devices = []
 
+        # Migrate any lowercase MT codes to uppercase
+        changed = False
+        for device in self._devices:
+            qr = device.get("matter_qr_code", "")
+            if qr and qr != qr.upper():
+                device["matter_qr_code"] = qr.upper()
+                changed = True
+        if changed:
+            await self.async_save()
+
     async def async_save(self) -> None:
         """Persist devices to storage."""
         await self._store.async_save({"devices": self._devices})
