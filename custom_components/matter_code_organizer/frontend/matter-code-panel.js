@@ -1044,7 +1044,7 @@ class MatterCodePanel extends HTMLElement {
       // Preserve current form values before switching to scanner
       if (this._editingDevice) {
         this._editingDevice.name = ($("#field-name")?.value || "").trim();
-        this._editingDevice.matter_qr_code = ($("#field-qr")?.value || "").trim();
+        this._editingDevice.matter_qr_code = ($("#field-qr")?.value || "").trim().toUpperCase();
         this._editingDevice.numeric_code = ($("#field-numeric")?.value || "").trim();
         this._editingDevice.manufacturer = ($("#field-manufacturer")?.value || "").trim();
         this._editingDevice.model = ($("#field-model")?.value || "").trim();
@@ -1130,6 +1130,9 @@ class MatterCodePanel extends HTMLElement {
           // Scanning from dialog: stop scanner and return to dialog
           this._stopScanner();
           this._scanning = false;
+        } else if (this._editingDevice && !this._scanning) {
+          // Edit dialog open: ignore overlay click, close only via Save/Cancel
+          return;
         } else {
           this._stopScanner();
           this._editingDevice = null;
@@ -1152,7 +1155,7 @@ class MatterCodePanel extends HTMLElement {
   async _handleSave() {
     const $ = (sel) => this.shadowRoot.querySelector(sel);
     const name = ($("#field-name")?.value || "").trim();
-    const qr = ($("#field-qr")?.value || "").trim();
+    const qr = ($("#field-qr")?.value || "").trim().toUpperCase();
     let numeric = ($("#field-numeric")?.value || "").trim();
     const manufacturer = ($("#field-manufacturer")?.value || "").trim();
     const model = ($("#field-model")?.value || "").trim();
@@ -1356,19 +1359,20 @@ class MatterCodePanel extends HTMLElement {
               inversionAttempts: "dontInvert",
             });
 
-            if (code && code.data && code.data.startsWith("MT:")) {
+            const scannedData = code ? code.data.toUpperCase() : "";
+            if (code && scannedData && scannedData.startsWith("MT:")) {
               this._stopScanner();
               this._scanning = false;
-              const derived = deriveNumericCode(code.data);
+              const derived = deriveNumericCode(scannedData);
               if (this._editingDevice) {
                 // Dialog scan: fill QR into existing device
-                this._editingDevice.matter_qr_code = code.data;
+                this._editingDevice.matter_qr_code = scannedData;
                 this._editingDevice.numeric_code = derived || this._editingDevice.numeric_code || "";
               } else {
                 // Main page scan: create new device
                 this._editingDevice = {
                   name: "",
-                  matter_qr_code: code.data,
+                  matter_qr_code: scannedData,
                   numeric_code: derived || "",
                   manufacturer: "",
                   model: "",
