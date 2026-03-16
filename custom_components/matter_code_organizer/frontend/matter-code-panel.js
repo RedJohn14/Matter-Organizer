@@ -1002,6 +1002,12 @@ class MatterCodePanel extends HTMLElement {
       }
     });
 
+    document.addEventListener("click", (e) => {
+      if (!e.composedPath().includes(this.shadowRoot.host)) {
+        $$(".dropdown").forEach((d) => d.remove());
+      }
+    });
+
     $("#btn-dialog-cancel")?.addEventListener("click", () => {
       this._editingDevice = null;
       this._render();
