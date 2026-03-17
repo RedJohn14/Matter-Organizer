@@ -14,7 +14,10 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 
-from .const import DOMAIN, GITLAB_BASE_URL
+from aiohttp import ClientTimeout
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
+
+from .const import DOMAIN, GITLAB_BASE_URL, GITLAB_MANIFEST_URL
 from .store import MatterCodeStore
 
 PLATFORMS = ["update"]
@@ -315,10 +318,27 @@ async def ws_restore(hass, connection, msg):
 )
 @websocket_api.async_response
 async def ws_check_update(hass, connection, msg):
-    """Return cached update info."""
+    """Return update info, fetching from GitLab if not cached."""
     domain_data = hass.data.get(DOMAIN, {})
     installed = domain_data.get("installed_version", "0.0.0")
-    latest = domain_data.get("latest_version", installed)
+    latest = domain_data.get("latest_version")
+
+    # Fetch from GitLab if no cached value
+    if not latest:
+        session = async_get_clientsession(hass)
+        try:
+            resp = await session.get(
+                GITLAB_MANIFEST_URL, timeout=ClientTimeout(total=10)
+            )
+            if resp.status == 200:
+                data = await resp.json(content_type=None)
+                latest = data.get("version", installed)
+                domain_data["latest_version"] = latest
+        except Exception:
+            latest = installed
+        if not latest:
+            latest = installed
+
     installed_t = tuple(int(x) for x in installed.split("."))
     latest_t = tuple(int(x) for x in latest.split("."))
     connection.send_result(
