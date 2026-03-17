@@ -937,7 +937,13 @@ class MatterCodePanel extends HTMLElement {
 
     $("#search-input")?.addEventListener("input", (e) => {
       this._searchQuery = e.target.value;
+      const pos = e.target.selectionStart;
       this._render();
+      const input = $("#search-input");
+      if (input) {
+        input.focus();
+        input.setSelectionRange(pos, pos);
+      }
     });
 
     $("#btn-sort")?.addEventListener("click", () => {
@@ -1006,7 +1012,7 @@ class MatterCodePanel extends HTMLElement {
       if (!e.composedPath().includes(this.shadowRoot.host)) {
         $$(".dropdown").forEach((d) => d.remove());
       }
-    });
+    }, true);
 
     $("#btn-dialog-cancel")?.addEventListener("click", () => {
       this._editingDevice = null;
