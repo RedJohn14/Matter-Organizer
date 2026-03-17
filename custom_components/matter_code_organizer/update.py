@@ -8,7 +8,11 @@ import logging
 from homeassistant.components.update import UpdateEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from aiohttp import ClientTimeout
+
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.device_registry import DeviceEntryType
+from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import (
@@ -32,14 +36,6 @@ async def async_setup_entry(
     async_add_entities([MatterCodeOrganizerUpdate(hass, entry)])
 
 
-def _version_tuple(version: str) -> tuple[int, ...]:
-    """Convert version string to tuple of ints for comparison."""
-    try:
-        return tuple(int(x) for x in version.split("."))
-    except (ValueError, AttributeError):
-        return (0,)
-
-
 class MatterCodeOrganizerUpdate(UpdateEntity):
     """Update entity that checks GitLab for newer versions."""
 
@@ -50,6 +46,11 @@ class MatterCodeOrganizerUpdate(UpdateEntity):
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
         """Initialize the update entity."""
         self._attr_unique_id = f"{entry.entry_id}_update"
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, entry.entry_id)},
+            name="Matter Code Organizer",
+            entry_type=DeviceEntryType.SERVICE,
+        )
         self._entry = entry
         self._installed = hass.data[DOMAIN].get("installed_version", "0.0.0")
         self._latest: str | None = None
@@ -73,7 +74,10 @@ class MatterCodeOrganizerUpdate(UpdateEntity):
         """Check GitLab for a newer version."""
         session = async_get_clientsession(self.hass)
         try:
-            resp = await session.get(GITLAB_MANIFEST_URL, timeout=10)
+            resp = await session.get(
+                GITLAB_MANIFEST_URL,
+                timeout=ClientTimeout(total=10),
+            )
             if resp.status != 200:
                 _LOGGER.warning(
                     "Update check failed: HTTP %s from GitLab", resp.status
