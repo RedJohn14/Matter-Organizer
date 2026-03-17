@@ -169,6 +169,7 @@ class MatterCodePanel extends HTMLElement {
     this._showBackupMenu = false;
     this._zoomedQR = null;
     this._updateAvailable = false;
+    this._updateDismissed = false;
     this._latestVersion = null;
     this._releaseUrl = null;
   }
@@ -371,6 +372,33 @@ class MatterCodePanel extends HTMLElement {
           0%, 100% { opacity: 1; }
           50% { opacity: 0.7; }
         }
+        .update-banner {
+          display: flex; align-items: center; gap: 10px;
+          background: linear-gradient(135deg, #fff3e0, #ffe0b2); border: 1px solid #ffb74d;
+          border-radius: 10px; padding: 12px 16px; margin-bottom: 16px;
+          color: #e65100; font-size: 14px; font-weight: 500;
+          box-shadow: 0 2px 8px rgba(255, 152, 0, 0.15);
+        }
+        .update-banner-icon {
+          flex-shrink: 0; width: 28px; height: 28px;
+          background: #ff9800; border-radius: 50%;
+          display: flex; align-items: center; justify-content: center;
+          color: #fff; font-size: 16px;
+        }
+        .update-banner-text { flex: 1; }
+        .update-banner-text strong { color: #bf360c; }
+        .update-banner-versions { font-size: 13px; color: #e65100; opacity: 0.85; margin-top: 2px; }
+        .update-banner-view {
+          background: #ff9800; color: #fff; border: none; border-radius: 6px;
+          padding: 6px 14px; cursor: pointer; font-size: 13px; font-weight: 600;
+          white-space: nowrap;
+        }
+        .update-banner-view:hover { background: #f57c00; }
+        .update-banner-dismiss {
+          background: none; border: none; color: #e65100; cursor: pointer;
+          font-size: 18px; padding: 4px 6px; opacity: 0.6; line-height: 1;
+        }
+        .update-banner-dismiss:hover { opacity: 1; }
         .toolbar-dropdown { position: relative; display: inline-block; }
         .toolbar-dropdown-menu {
           position: absolute; right: 0; top: calc(100% + 4px);
@@ -644,6 +672,19 @@ class MatterCodePanel extends HTMLElement {
       </div>
 
       <div class="content">
+        ${this._updateAvailable && !this._updateDismissed ? `
+          <div class="update-banner">
+            <div class="update-banner-icon">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M4 12l1.41 1.41L11 7.83V20h2V7.83l5.58 5.59L20 12l-8-8-8 8z"/></svg>
+            </div>
+            <div class="update-banner-text">
+              <strong>${this._t("updateAvailable")}</strong>
+              <div class="update-banner-versions">v${this._escHtml(this._version)} → v${this._escHtml(this._latestVersion || "")}</div>
+            </div>
+            <button class="update-banner-view" id="btn-banner-view">${this._t("openReleasePage").replace("?", "")}</button>
+            <button class="update-banner-dismiss" id="btn-banner-dismiss" title="Dismiss">✕</button>
+          </div>
+        ` : ""}
         ${this._devices.length > 0
           ? `<div class="search-bar">
               <input type="text" id="search-input" placeholder="${this._t("search")}" value="${this._escHtml(this._searchQuery)}">
@@ -917,6 +958,15 @@ class MatterCodePanel extends HTMLElement {
       if (confirm(msg) && this._releaseUrl) {
         window.open(this._releaseUrl, "_blank");
       }
+    });
+
+    $("#btn-banner-view")?.addEventListener("click", () => {
+      if (this._releaseUrl) window.open(this._releaseUrl, "_blank");
+    });
+
+    $("#btn-banner-dismiss")?.addEventListener("click", () => {
+      this._updateDismissed = true;
+      this._render();
     });
 
     $("#btn-add")?.addEventListener("click", () => {
