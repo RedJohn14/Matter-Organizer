@@ -57,5 +57,10 @@
   "restoreConfirm": "This will replace all current data. Continue?",
   "restoreSuccess": "Data restored successfully.",
   "restoreError": "Invalid backup file.",
-  "editorInvalidJson": "Invalid JSON format."
+  "editorInvalidJson": "Invalid JSON format.",
+  "updateAvailable": "Update available",
+  "updateAvailableDetail": "A new version of Matter Code Organizer is available.",
+  "installedVersion": "Installed",
+  "latestVersion": "Latest",
+  "openReleasePage": "Open release page?"
 }

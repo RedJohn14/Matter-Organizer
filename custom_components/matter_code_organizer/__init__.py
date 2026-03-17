@@ -14,8 +14,10 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 
-from .const import DOMAIN
+from .const import DOMAIN, GITLAB_BASE_URL
 from .store import MatterCodeStore
+
+PLATFORMS = ["update"]
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -45,7 +47,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     store = MatterCodeStore(hass)
     await store.async_load()
 
-    hass.data[DOMAIN] = {"store": store, "entry": entry}
+    hass.data[DOMAIN] = {"store": store, "entry": entry, "installed_version": None}
 
     # Register WebSocket commands
     websocket_api.async_register_command(hass, ws_get_devices)
@@ -69,6 +71,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     manifest_path = os.path.join(integration_path, "manifest.json")
     with open(manifest_path) as f:
         manifest_version = json.load(f)["version"]
+    hass.data[DOMAIN]["installed_version"] = manifest_version
 
     # Register sidebar panel
     await panel_custom.async_register_panel(
@@ -81,6 +84,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         config={"version": manifest_version},
     )
 
+    # Register update check WS command
+    websocket_api.async_register_command(hass, ws_check_update)
+
+    # Forward platforms (update entity)
+    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+
     # Sync device registry
     await _sync_device_registry(hass, entry, store)
 
@@ -89,6 +98,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload Matter Code Organizer."""
+    await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     frontend.async_remove_panel(hass, PANEL_FRONTEND_PATH)
     hass.data.pop(DOMAIN, None)
     return True
@@ -298,3 +308,25 @@ async def ws_restore(hass, connection, msg):
     entry = hass.data[DOMAIN]["entry"]
     await _sync_device_registry(hass, entry, store)
     connection.send_result(msg["id"], {})
+
+
+@websocket_api.websocket_command(
+    {vol.Required("type"): "matter_code_organizer/check_update"}
+)
+@websocket_api.async_response
+async def ws_check_update(hass, connection, msg):
+    """Return cached update info."""
+    domain_data = hass.data.get(DOMAIN, {})
+    installed = domain_data.get("installed_version", "0.0.0")
+    latest = domain_data.get("latest_version", installed)
+    installed_t = tuple(int(x) for x in installed.split("."))
+    latest_t = tuple(int(x) for x in latest.split("."))
+    connection.send_result(
+        msg["id"],
+        {
+            "installed_version": installed,
+            "latest_version": latest,
+            "update_available": latest_t > installed_t,
+            "release_url": f"{GITLAB_BASE_URL}/hassio/matter-organizer",
+        },
+    )

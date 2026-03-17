@@ -168,6 +168,9 @@ class MatterCodePanel extends HTMLElement {
     this._editorData = "";
     this._showBackupMenu = false;
     this._zoomedQR = null;
+    this._updateAvailable = false;
+    this._latestVersion = null;
+    this._releaseUrl = null;
   }
 
   set hass(hass) {
@@ -179,6 +182,7 @@ class MatterCodePanel extends HTMLElement {
       _loadTranslations(this._lang).then(() => {
         this._loadDevices();
         this._loadMatterHADevices();
+        this._checkUpdate();
       });
     }
   }
@@ -216,6 +220,20 @@ class MatterCodePanel extends HTMLElement {
     } catch (e) {
       console.error("Failed to load HA Matter devices:", e);
       this._matterHADevices = [];
+    }
+  }
+
+  async _checkUpdate() {
+    try {
+      const result = await this._hass.callWS({
+        type: "matter_code_organizer/check_update",
+      });
+      this._updateAvailable = result.update_available || false;
+      this._latestVersion = result.latest_version || null;
+      this._releaseUrl = result.release_url || null;
+      if (this._updateAvailable) this._render();
+    } catch (e) {
+      console.warn("Update check failed:", e);
     }
   }
 
@@ -342,6 +360,17 @@ class MatterCodePanel extends HTMLElement {
         }
         .toolbar-actions button:hover { background: rgba(255,255,255,0.3); }
         .toolbar-actions button:disabled { opacity: 0.5; cursor: default; }
+        .update-badge {
+          background: rgba(255, 152, 0, 0.15); border: 1px solid rgba(255, 152, 0, 0.5);
+          color: #ff9800; border-radius: 4px; padding: 6px 12px; cursor: pointer;
+          font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 6px;
+          animation: update-pulse 2s ease-in-out infinite;
+        }
+        .update-badge:hover { background: rgba(255, 152, 0, 0.25); }
+        @keyframes update-pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.7; }
+        }
         .toolbar-dropdown { position: relative; display: inline-block; }
         .toolbar-dropdown-menu {
           position: absolute; right: 0; top: calc(100% + 4px);
@@ -566,6 +595,12 @@ class MatterCodePanel extends HTMLElement {
           <span class="version-badge">v${this._escHtml(this._version)}</span>
         </div>
         <div class="toolbar-actions">
+          ${this._updateAvailable ? `
+            <button class="update-badge" id="btn-update-info" title="${this._t("updateAvailable")}">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M11 7h2v2h-2zm0 4h2v6h-2zm1-9C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg>
+              <span class="btn-text">${this._t("updateAvailable")}</span>
+            </button>
+          ` : ""}
           <div class="toolbar-dropdown">
             <button id="btn-backup-restore">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3C7.58 3 4 6.58 4 11H1l3.89 3.89.07.14L9 11H6c0-3.31 2.69-6 6-6s6 2.69 6 6-2.69 6-6 6c-1.66 0-3.14-.69-4.22-1.78L6.34 16.66C7.9 18.24 9.83 19 12 19c4.42 0 8-3.58 8-8s-3.58-8-8-8zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H11z"/></svg>
@@ -874,6 +909,13 @@ class MatterCodePanel extends HTMLElement {
       if (e.target.id === "qr-zoom-overlay") {
         this._zoomedQR = null;
         this._render();
+      }
+    });
+
+    $("#btn-update-info")?.addEventListener("click", () => {
+      const msg = `${this._t("updateAvailableDetail")}\n\n${this._t("installedVersion")}: v${this._version}\n${this._t("latestVersion")}: v${this._latestVersion}\n\n${this._t("openReleasePage")}`;
+      if (confirm(msg) && this._releaseUrl) {
+        window.open(this._releaseUrl, "_blank");
       }
     });
 
