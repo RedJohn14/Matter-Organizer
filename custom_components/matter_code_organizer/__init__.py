@@ -318,13 +318,16 @@ async def ws_restore(hass, connection, msg):
 )
 @websocket_api.async_response
 async def ws_check_update(hass, connection, msg):
-    """Return update info, fetching from GitLab if not cached."""
+    """Return update info, fetching from GitLab with 5-minute cache."""
+    import time
+
     domain_data = hass.data.get(DOMAIN, {})
     installed = domain_data.get("installed_version", "0.0.0")
     latest = domain_data.get("latest_version")
+    last_check = domain_data.get("last_update_check", 0)
 
-    # Fetch from GitLab if no cached value
-    if not latest:
+    # Re-fetch from GitLab if cache is empty or older than 5 minutes
+    if not latest or (time.time() - last_check) > 300:
         session = async_get_clientsession(hass)
         try:
             resp = await session.get(
@@ -334,10 +337,11 @@ async def ws_check_update(hass, connection, msg):
                 data = await resp.json(content_type=None)
                 latest = data.get("version", installed)
                 domain_data["latest_version"] = latest
+                domain_data["last_update_check"] = time.time()
         except Exception:
-            latest = installed
-        if not latest:
-            latest = installed
+            pass
+    if not latest:
+        latest = installed
 
     installed_t = tuple(int(x) for x in installed.split("."))
     latest_t = tuple(int(x) for x in latest.split("."))
