@@ -329,6 +329,21 @@ class MatterCodePanel extends HTMLElement {
     }
   }
 
+  _copyToClipboard(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(text);
+    }
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand("copy");
+    document.body.removeChild(ta);
+    return Promise.resolve();
+  }
+
   _render() {
     const devices = this._filteredDevices;
 
@@ -1064,10 +1079,12 @@ class MatterCodePanel extends HTMLElement {
         const text = btn.dataset.copy;
         const card = btn.closest(".device-card");
         if (!card) return;
-        navigator.clipboard.writeText(text).then(() => {
+        this._copyToClipboard(text).then(() => {
           this._copiedId = card.dataset.id;
           this._render();
           setTimeout(() => { this._copiedId = null; this._render(); }, 1500);
+        }).catch((err) => {
+          console.error("Failed to copy:", err);
         });
       });
     });
