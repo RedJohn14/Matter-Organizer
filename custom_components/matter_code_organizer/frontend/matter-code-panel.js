@@ -185,6 +185,16 @@ class MatterCodePanel extends HTMLElement {
         this._loadMatterHADevices();
         this._checkUpdate();
       });
+    } else if (!this.shadowRoot.querySelector('.toolbar')) {
+      this._loadDevices();
+      this._loadMatterHADevices();
+    }
+  }
+
+  connectedCallback() {
+    if (this._initialized && this._hass) {
+      this._loadDevices();
+      this._loadMatterHADevices();
     }
   }
 
